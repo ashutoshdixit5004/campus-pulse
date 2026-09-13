@@ -227,7 +227,7 @@ export default function AdminCertificatesPage() {
         isOpen={isCertModalOpen}
         onClose={() => setIsCertModalOpen(false)}
         eventTitle={selectedEvent?.name || 'Technova 2026'}
-        studentName="Alex Chen"
+        studentName="Ashutosh Dixit"
         role="Verified Attendee"
         date={selectedEvent?.date || 'Oct 24, 2026'}
         authCode="CERT-2026-TN-0841"

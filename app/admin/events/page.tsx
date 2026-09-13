@@ -11,13 +11,20 @@ export default function AdminEventsPage() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [eventToDelete, setEventToDelete] = useState<EventItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [permanentDelete, setPermanentDelete] = useState(false);
   const { showToast } = useToast();
 
+  const loadEvents = async () => {
+    setLoading(true);
+    const evs = await getEvents();
+    setEvents(evs);
+    setLoading(false);
+  };
+
   useEffect(() => {
-    getEvents().then((evs) => {
-      setEvents(evs);
-      setLoading(false);
-    });
+    loadEvents();
   }, []);
 
   const handleCopyLink = (slug: string) => {
@@ -27,6 +34,30 @@ export default function AdminEventsPage() {
         .writeText(url)
         .then(() => showToast(`✓ Copied registration link: ${url}`))
         .catch(() => showToast(`Link: ${url}`));
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!eventToDelete) return;
+    setIsDeleting(true);
+
+    try {
+      const res = await fetch(`/api/events?id=${encodeURIComponent(eventToDelete.id)}&permanent=${permanentDelete}`, {
+        method: 'DELETE',
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to delete event');
+      }
+
+      showToast(`✓ Event "${eventToDelete.name}" ${permanentDelete ? 'permanently deleted' : 'safely archived'}.`);
+      setEventToDelete(null);
+      await loadEvents();
+    } catch (err: any) {
+      showToast(err.message || 'Error deleting event', 'error');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -135,38 +166,41 @@ export default function AdminEventsPage() {
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                          {/* 1. VIEW: Opens /admin/events/[id] */}
+                          <Link
+                            href={`/admin/events/${ev.id}`}
+                            className="btn btn-secondary btn-sm"
+                            title="View Operational Control Center"
+                          >
+                            <i className="fa-solid fa-eye"></i> View
+                          </Link>
+
+                          {/* 2. EDIT: Opens /admin/events/[id] Control Center */}
                           <Link
                             href={`/admin/events/${ev.id}`}
                             className="btn btn-primary btn-sm"
-                            title="Event Control Center"
+                            title="Manage & Edit Event Specifications"
                           >
-                            <i className="fa-solid fa-sliders"></i> MANAGE
+                            <i className="fa-solid fa-pen-to-square"></i> Edit
                           </Link>
-                          <Link
-                            href={`/register/${ev.slug}`}
-                            className="btn btn-secondary btn-sm"
-                            title="Preview Public Link"
-                          >
-                            <i className="fa-solid fa-eye"></i> VIEW
-                          </Link>
-                          <Link
-                            href="/admin/registrations"
-                            className="btn btn-secondary btn-sm"
-                            title="Manage Registrations"
-                          >
-                            <i className="fa-solid fa-users"></i> REGS
-                          </Link>
-                          <Link
-                            href={`/admin/scanner?event=${ev.slug}`}
-                            className="btn btn-secondary btn-sm"
-                            title="Open QR Scanner"
-                          >
-                            <i className="fa-solid fa-qrcode"></i> SCAN
-                          </Link>
+
+                          {/* 3. DELETE: Safe deletion modal */}
                           <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            style={{ color: 'var(--accent-red)' }}
+                            onClick={() => setEventToDelete(ev)}
+                            title="Delete / Archive Event"
+                          >
+                            <i className="fa-solid fa-trash-can"></i> Delete
+                          </button>
+
+                          {/* Quick Link Helper */}
+                          <button
+                            type="button"
                             className="btn btn-secondary btn-sm"
                             onClick={() => handleCopyLink(ev.slug)}
-                            title="Copy Registration Link"
+                            title="Copy Public Registration Link"
                           >
                             <i className="fa-solid fa-link"></i>
                           </button>
@@ -197,6 +231,99 @@ export default function AdminEventsPage() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {eventToDelete && (
+        <div className="modal-overlay active" style={{ zIndex: 9999 }}>
+          <div className="modal-card" style={{ maxWidth: '520px', textAlign: 'left' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1rem' }}>
+              <div
+                style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'rgba(255, 59, 48, 0.15)',
+                  border: '1px solid var(--accent-red)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--accent-red)',
+                  fontSize: '18px',
+                }}
+              >
+                <i className="fa-solid fa-triangle-exclamation"></i>
+              </div>
+              <div>
+                <h3 style={{ fontSize: '18px', margin: 0 }}>Confirm Event Deletion</h3>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                  Event: {eventToDelete.name}
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                padding: '1rem',
+                background: '#12141c',
+                border: '1px solid rgba(255, 59, 48, 0.3)',
+                borderRadius: 'var(--radius-sm)',
+                marginBottom: '1.25rem',
+                fontSize: '13px',
+                color: 'var(--text-secondary)',
+                lineHeight: 1.6,
+              }}
+            >
+              <strong style={{ color: '#fff' }}>Warning:</strong> Removing this event will remove it from public discoverability and active registrations.
+              <div style={{ marginTop: '0.5rem', color: 'var(--text-muted)' }}>
+                Associated registrations, entry passes, attendance records, certificates, and evaluation marks will be safely handled according to institutional data policies.
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                <input
+                  type="checkbox"
+                  checked={permanentDelete}
+                  onChange={(e) => setPermanentDelete(e.target.checked)}
+                />
+                <span>Permanently purge event and cascade delete all dependent records</span>
+              </label>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '22px', marginTop: '3px' }}>
+                Unchecked: Safely archives the event so historical attendance and issued certificates remain preserved.
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setEventToDelete(null)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                style={{ background: 'var(--accent-red)', borderColor: 'var(--accent-red)' }}
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <>
+                    <i className="fa-solid fa-spinner fa-spin"></i> Processing...
+                  </>
+                ) : (
+                  <>
+                    <i className="fa-solid fa-trash-can"></i> Confirm Deletion
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
+

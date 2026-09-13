@@ -4,7 +4,11 @@ import {
   DigitalPassItem, 
   AttendanceRecord, 
   CertificateItem, 
-  DashboardStats 
+  DashboardStats, 
+  StudentAccount, 
+  EvaluationItem, 
+  EvaluationResult,
+  AdminProfile
 } from '@/types/database';
 import { supabase, supabaseAdmin, isSupabaseConfigured } from './supabase';
 
@@ -17,269 +21,56 @@ function getClient(privileged: boolean = false) {
   return supabase;
 }
 
-// Initial default seed dataset for demonstration and local fallback
-const INITIAL_EVENTS: EventItem[] = [
-  {
-    id: 'ev_technova',
-    slug: 'technova-2026',
-    name: 'Technova 2026 // 48-Hr Hackathon',
-    description: 'The flagship collegiate engineering tournament of the semester. 48 hours of hands-on prototyping, AI tracks, and industry maker mentorship.',
-    category: 'Technical',
-    date: '2026-10-24',
-    start_time: '09:00',
-    end_time: '21:00',
-    venue: 'Main Tech Auditorium // Complex B',
-    capacity: 150,
-    registration_deadline: '2026-10-22T23:59:00Z',
-    organizer_name: 'ACM Student Chapter & Dept of CSE',
-    organizer_contact: 'acm@campus.edu • +1 555-0192',
-    eligibility: 'Open to all enrolled undergraduate & graduate STEM students',
-    rules: 'Teams of 1-4. Bring physical college ID card. Turnstile check-in mandatory for certificate.',
-    status: 'OPEN',
-    event_status: 'LIVE',
-    created_at: '2026-09-01T00:00:00Z',
-    registered_count: 8,
-    verified_count: 5,
-    checkins_count: 4
-  },
-  {
-    id: 'ev_aurora',
-    slug: 'aurora-2026',
-    name: 'Aurora Cultural Fest 2026',
-    description: 'Inter-collegiate arts, acoustics, theatre, and electronic music festival with over 20 visiting universities.',
-    category: 'Cultural',
-    date: '2026-11-12',
-    start_time: '17:00',
-    end_time: '22:00',
-    venue: 'Open Air Theatre',
-    capacity: 500,
-    registration_deadline: '2026-11-10T23:59:00Z',
-    organizer_name: 'Student Cultural Council',
-    organizer_contact: 'cultural@campus.edu • +1 555-0188',
-    eligibility: 'All college students with valid student credentials',
-    rules: 'Doors open at 16:30. Entry strictly with Digital QR Pass.',
-    status: 'OPEN',
-    event_status: 'UPCOMING',
-    created_at: '2026-09-05T00:00:00Z',
-    registered_count: 0,
-    verified_count: 0,
-    checkins_count: 0
-  },
-  {
-    id: 'ev_robowars',
-    slug: 'robowars-2026',
-    name: 'RoboWars Arena Championship',
-    description: 'Weight-class combat robotics knockout tournament. 15lb & 30lb combat bot battlecage matches.',
-    category: 'Robotics',
-    date: '2026-11-20',
-    start_time: '10:00',
-    end_time: '18:00',
-    venue: 'Mechanical Workshop Arena',
-    capacity: 100,
-    registration_deadline: '2026-11-18T23:59:00Z',
-    organizer_name: 'Robotics & Mechatronics Society',
-    organizer_contact: 'robotics@campus.edu',
-    eligibility: 'Engineering undergraduate cohorts',
-    rules: 'Safety cage protocols apply. Pit access restricted to registered team pilots.',
-    status: 'CLOSED',
-    event_status: 'UPCOMING',
-    created_at: '2026-09-08T00:00:00Z',
-    registered_count: 0,
-    verified_count: 0,
-    checkins_count: 0
-  },
-  {
-    id: 'ev_esummit',
-    slug: 'esummit-2026',
-    name: 'National E-Summit 2026',
-    description: 'Collegiate startup conclave, angel pitching sessions, founder keynotes, and product showcase.',
-    category: 'Entrepreneurship',
-    date: '2026-10-10',
-    start_time: '09:00',
-    end_time: '17:00',
-    venue: 'Convention Hall',
-    capacity: 250,
-    registration_deadline: '2026-10-08T23:59:00Z',
-    organizer_name: 'E-Cell Apex & Innovation Incubator',
-    organizer_contact: 'ecell@campus.edu',
-    eligibility: 'All students & aspiring founders',
-    rules: 'Formal attire requested for investor lounges.',
-    status: 'CLOSED',
-    event_status: 'COMPLETED',
-    created_at: '2026-09-01T00:00:00Z',
-    registered_count: 1,
-    verified_count: 1,
-    checkins_count: 1
-  }
-];
+// Clean production datasets — starting state has ZERO mock records
+const INITIAL_EVENTS: EventItem[] = [];
+const INITIAL_STUDENTS: StudentAccount[] = [];
+const INITIAL_EVALUATIONS: EvaluationItem[] = [];
+const INITIAL_REGISTRATIONS: RegistrationItem[] = [];
+const INITIAL_CERTIFICATES: CertificateItem[] = [];
 
-const INITIAL_REGISTRATIONS: RegistrationItem[] = [
-  {
-    id: 'reg_001',
-    event_id: 'ev_technova',
-    registration_number: 'REG-2026-TN-0492',
-    name: 'Alex Chen',
-    student_id: 'STU-2024-8841',
-    college: 'Apex Institute of Technology',
-    course: 'B.Tech Computer Science',
-    semester: 'Year 3 // Sem 5',
-    email: 'alex.chen@campus.edu',
-    phone: '+1 (555) 019-2834',
-    status: 'VERIFIED',
-    access_token: 'tok_alex_chen_demo_2026',
-    pass_token: 'PASS-TN-0492',
-    pass_id: 'pass_001',
-    checked_in: true,
-    checkin_time: '09:14:22 AM',
-    gate: 'Gate 02',
-    event_name: 'Technova 2026 // 48-Hr Hackathon',
-    created_at: '2026-10-18T14:22:00Z'
-  },
-  {
-    id: 'reg_002',
-    event_id: 'ev_technova',
-    registration_number: 'REG-2026-TN-0488',
-    name: 'Maya Lin',
-    student_id: 'STU-2024-3102',
-    college: 'Apex Institute of Technology',
-    course: 'B.Tech AI & Data Science',
-    semester: 'Year 2 // Sem 3',
-    email: 'maya.lin@campus.edu',
-    phone: '+1 (555) 018-9921',
-    status: 'VERIFIED',
-    access_token: 'tok_maya_lin_demo_2026',
-    pass_token: 'PASS-TN-0488',
-    pass_id: 'pass_002',
-    checked_in: true,
-    checkin_time: '09:12:05 AM',
-    gate: 'Gate 02',
-    event_name: 'Technova 2026 // 48-Hr Hackathon',
-    created_at: '2026-10-18T15:40:00Z'
-  },
-  {
-    id: 'reg_003',
-    event_id: 'ev_technova',
-    registration_number: 'REG-2026-TN-0475',
-    name: 'Ryan Patel',
-    student_id: 'STU-2023-9921',
-    college: 'Apex Institute of Technology',
-    course: 'B.Tech Electronics & Comm',
-    semester: 'Year 3 // Sem 5',
-    email: 'ryan.p@campus.edu',
-    phone: '+1 (555) 012-4412',
-    status: 'VERIFIED',
-    access_token: 'tok_ryan_patel_demo_2026',
-    pass_token: 'PASS-TN-0475',
-    pass_id: 'pass_003',
-    checked_in: true,
-    checkin_time: '09:10:48 AM',
-    gate: 'Gate 01',
-    event_name: 'Technova 2026 // 48-Hr Hackathon',
-    created_at: '2026-10-19T10:12:00Z'
-  },
-  {
-    id: 'reg_004',
-    event_id: 'ev_technova',
-    registration_number: 'REG-2026-TN-0461',
-    name: 'Sarah Jenkins',
-    student_id: 'STU-2024-1184',
-    college: 'Apex Institute of Technology',
-    course: 'B.Tech Software Engineering',
-    semester: 'Year 1 // Sem 1',
-    email: 'sarah.j@campus.edu',
-    phone: '+1 (555) 017-8832',
-    status: 'VERIFIED',
-    access_token: 'tok_sarah_jenkins_demo_2026',
-    pass_token: 'PASS-TN-0461',
-    pass_id: 'pass_004',
-    checked_in: true,
-    checkin_time: '09:08:15 AM',
-    gate: 'Gate 02',
-    event_name: 'Technova 2026 // 48-Hr Hackathon',
-    created_at: '2026-10-19T11:35:00Z'
-  },
-  {
-    id: 'reg_005',
-    event_id: 'ev_technova',
-    registration_number: 'REG-2026-TN-0450',
-    name: 'Marcus Vance',
-    student_id: 'STU-2024-4491',
-    college: 'Apex Institute of Technology',
-    course: 'B.Tech Mechanical (Mechatronics)',
-    semester: 'Year 2 // Sem 3',
-    email: 'marcus.v@campus.edu',
-    phone: '+1 (555) 019-3312',
-    status: 'PENDING',
-    access_token: 'tok_marcus_vance_demo_2026',
-    event_name: 'Technova 2026 // 48-Hr Hackathon',
-    created_at: '2026-10-20T08:44:00Z'
-  },
-  {
-    id: 'reg_006',
-    event_id: 'ev_technova',
-    registration_number: 'REG-2026-TN-0451',
-    name: 'Elena Rostova',
-    student_id: 'STU-2023-7729',
-    college: 'Apex Institute of Technology',
-    course: 'B.Tech Computer Science',
-    semester: 'Year 4 // Sem 7',
-    email: 'elena.r@campus.edu',
-    phone: '+1 (555) 014-9901',
-    status: 'PENDING',
-    access_token: 'tok_elena_rostova_demo_2026',
-    event_name: 'Technova 2026 // 48-Hr Hackathon',
-    created_at: '2026-10-20T09:15:00Z'
-  },
-  {
-    id: 'reg_007',
-    event_id: 'ev_technova',
-    registration_number: 'REG-2026-TN-0498',
-    name: 'David Kim',
-    student_id: 'STU-2024-5510',
-    college: 'Apex Institute of Technology',
-    course: 'B.Tech Electrical & Electronics',
-    semester: 'Year 2 // Sem 3',
-    email: 'david.kim@campus.edu',
-    phone: '+1 (555) 016-7782',
-    status: 'VERIFIED',
-    access_token: 'tok_david_kim_demo_2026',
-    pass_token: 'PASS-TN-0498',
-    pass_id: 'pass_007',
-    checked_in: false,
-    event_name: 'Technova 2026 // 48-Hr Hackathon',
-    created_at: '2026-10-20T11:20:00Z'
-  },
-  {
-    id: 'reg_008',
-    event_id: 'ev_technova',
-    registration_number: 'REG-2026-TN-0452',
-    name: 'Chloe Bennett',
-    student_id: 'STU-2024-6632',
-    college: 'Apex Institute of Technology',
-    course: 'B.Tech Information Science',
-    semester: 'Year 3 // Sem 5',
-    email: 'chloe.b@campus.edu',
-    phone: '+1 (555) 011-2299',
-    status: 'PENDING',
-    access_token: 'tok_chloe_bennett_demo_2026',
-    event_name: 'Technova 2026 // 48-Hr Hackathon',
-    created_at: '2026-10-21T14:05:00Z'
-  }
-];
+export const DEFAULT_ADMIN_PROFILE: AdminProfile = {
+  name: 'Dr. Vipasha',
+  email: 'vipasha@sheat.edu',
+  title: 'Dean of Student Affairs // Head of Events',
+  phone: '+91 542 262 4884',
+  department: 'Office of Student Affairs',
+  updated_at: new Date().toISOString(),
+};
 
-const INITIAL_CERTIFICATES: CertificateItem[] = [
-  {
-    id: 'cert_001',
-    event_id: 'ev_esummit',
-    registration_id: 'reg_001',
-    certificate_number: 'CERT-2026-NES-0192',
-    role: 'Delegate Participant',
-    event_name: 'National E-Summit 2026',
-    student_name: 'Alex Chen',
-    event_date: 'Oct 10, 2026',
-    issued_at: '2026-10-10T18:00:00Z'
+// Safe isomorphic server filesystem helpers
+function getFs(): any {
+  if (typeof window === 'undefined') {
+    try {
+      return require('fs');
+    } catch {
+      return null;
+    }
   }
-];
+  return null;
+}
+
+function getPath(): any {
+  if (typeof window === 'undefined') {
+    try {
+      return require('path');
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function getDataDir(): string | null {
+  const p = getPath();
+  if (!p) return null;
+  return p.join(process.cwd(), 'data');
+}
+
+function getDbFilePath(): string | null {
+  const p = getPath();
+  if (!p) return null;
+  return p.join(process.cwd(), 'data', 'db.json');
+}
 
 // In-Memory store for development / local fallback (attached to globalThis to survive dev HMR & compilation reloads)
 const g = globalThis as any;
@@ -292,33 +83,119 @@ if (!g.__campus_pulse_registrations) {
 if (!g.__campus_pulse_certificates) {
   g.__campus_pulse_certificates = JSON.parse(JSON.stringify(INITIAL_CERTIFICATES));
 }
+if (!g.__campus_pulse_students) {
+  g.__campus_pulse_students = JSON.parse(JSON.stringify(INITIAL_STUDENTS));
+}
+if (!g.__campus_pulse_evaluations) {
+  g.__campus_pulse_evaluations = JSON.parse(JSON.stringify(INITIAL_EVALUATIONS));
+}
+if (!g.__campus_pulse_admin_profile) {
+  g.__campus_pulse_admin_profile = JSON.parse(JSON.stringify(DEFAULT_ADMIN_PROFILE));
+}
 
 let memoryEvents: EventItem[] = g.__campus_pulse_events;
 let memoryRegistrations: RegistrationItem[] = g.__campus_pulse_registrations;
 let memoryCertificates: CertificateItem[] = g.__campus_pulse_certificates;
+let memoryStudents: StudentAccount[] = g.__campus_pulse_students;
+let memoryEvaluations: EvaluationItem[] = g.__campus_pulse_evaluations;
+let memoryAdminProfile: AdminProfile = g.__campus_pulse_admin_profile;
+
+const STORAGE_KEY = 'campuspulse_clean_v3';
+
+function loadDiskStorage() {
+  const fs = getFs();
+  const dbFile = getDbFilePath();
+  if (!fs || !dbFile) return;
+  try {
+    if (fs.existsSync(dbFile)) {
+      const raw = fs.readFileSync(dbFile, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed.events)) memoryEvents = parsed.events;
+      if (Array.isArray(parsed.registrations)) memoryRegistrations = parsed.registrations;
+      if (Array.isArray(parsed.certificates)) memoryCertificates = parsed.certificates;
+      if (Array.isArray(parsed.students)) memoryStudents = parsed.students;
+      if (Array.isArray(parsed.evaluations)) memoryEvaluations = parsed.evaluations;
+      if (parsed.adminProfile) memoryAdminProfile = parsed.adminProfile;
+
+      const globalObj = globalThis as any;
+      globalObj.__campus_pulse_events = memoryEvents;
+      globalObj.__campus_pulse_registrations = memoryRegistrations;
+      globalObj.__campus_pulse_certificates = memoryCertificates;
+      globalObj.__campus_pulse_students = memoryStudents;
+      globalObj.__campus_pulse_evaluations = memoryEvaluations;
+      globalObj.__campus_pulse_admin_profile = memoryAdminProfile;
+    } else {
+      saveDiskStorage();
+    }
+  } catch (err) {
+    console.warn('Error loading disk storage:', err);
+  }
+}
+
+function saveDiskStorage() {
+  const fs = getFs();
+  const dataDir = getDataDir();
+  const dbFile = getDbFilePath();
+  if (!fs || !dataDir || !dbFile) return;
+  try {
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    const payload = {
+      events: memoryEvents,
+      registrations: memoryRegistrations,
+      certificates: memoryCertificates,
+      students: memoryStudents,
+      evaluations: memoryEvaluations,
+      adminProfile: memoryAdminProfile,
+    };
+    fs.writeFileSync(dbFile, JSON.stringify(payload, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('Error saving disk storage:', err);
+  }
+}
 
 function syncClientStorage() {
   const globalObj = globalThis as any;
-  memoryEvents = globalObj.__campus_pulse_events;
-  memoryRegistrations = globalObj.__campus_pulse_registrations;
-  memoryCertificates = globalObj.__campus_pulse_certificates;
+  if (globalObj.__campus_pulse_events) memoryEvents = globalObj.__campus_pulse_events;
+  if (globalObj.__campus_pulse_registrations) memoryRegistrations = globalObj.__campus_pulse_registrations;
+  if (globalObj.__campus_pulse_certificates) memoryCertificates = globalObj.__campus_pulse_certificates;
+  if (globalObj.__campus_pulse_students) memoryStudents = globalObj.__campus_pulse_students;
+  if (globalObj.__campus_pulse_evaluations) memoryEvaluations = globalObj.__campus_pulse_evaluations;
+  if (globalObj.__campus_pulse_admin_profile) memoryAdminProfile = globalObj.__campus_pulse_admin_profile;
 
   if (typeof window !== 'undefined') {
     try {
-      const stored = localStorage.getItem('campuspulse_next_state');
+      // Purge old demo storage keys so stale demo data cannot resurrect
+      localStorage.removeItem('campuspulse_next_state');
+      localStorage.removeItem('campuspulse_state');
+
+      const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed.events) {
+        if (Array.isArray(parsed.events)) {
           memoryEvents = parsed.events;
           globalObj.__campus_pulse_events = parsed.events;
         }
-        if (parsed.registrations) {
+        if (Array.isArray(parsed.registrations)) {
           memoryRegistrations = parsed.registrations;
           globalObj.__campus_pulse_registrations = parsed.registrations;
         }
-        if (parsed.certificates) {
+        if (Array.isArray(parsed.certificates)) {
           memoryCertificates = parsed.certificates;
           globalObj.__campus_pulse_certificates = parsed.certificates;
+        }
+        if (Array.isArray(parsed.students)) {
+          memoryStudents = parsed.students;
+          globalObj.__campus_pulse_students = parsed.students;
+        }
+        if (Array.isArray(parsed.evaluations)) {
+          memoryEvaluations = parsed.evaluations;
+          globalObj.__campus_pulse_evaluations = parsed.evaluations;
+        }
+        if (parsed.adminProfile) {
+          memoryAdminProfile = parsed.adminProfile;
+          globalObj.__campus_pulse_admin_profile = parsed.adminProfile;
         }
       } else {
         saveClientStorage();
@@ -326,6 +203,9 @@ function syncClientStorage() {
     } catch (e) {
       console.warn('Storage sync error:', e);
     }
+  } else {
+    // Server runtime: sync from disk
+    loadDiskStorage();
   }
 }
 
@@ -334,27 +214,58 @@ function saveClientStorage() {
   globalObj.__campus_pulse_events = memoryEvents;
   globalObj.__campus_pulse_registrations = memoryRegistrations;
   globalObj.__campus_pulse_certificates = memoryCertificates;
+  globalObj.__campus_pulse_students = memoryStudents;
+  globalObj.__campus_pulse_evaluations = memoryEvaluations;
+  globalObj.__campus_pulse_admin_profile = memoryAdminProfile;
 
   if (typeof window !== 'undefined') {
     try {
-      localStorage.setItem('campuspulse_next_state', JSON.stringify({
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
         events: memoryEvents,
         registrations: memoryRegistrations,
-        certificates: memoryCertificates
+        certificates: memoryCertificates,
+        students: memoryStudents,
+        evaluations: memoryEvaluations,
+        adminProfile: memoryAdminProfile,
       }));
     } catch (e) {
       console.warn('Storage save error:', e);
     }
+  } else {
+    // Server runtime: persist to disk
+    saveDiskStorage();
   }
 }
 
+// Initial sync
 syncClientStorage();
+
+// ============================================================================
+// ADMIN PROFILE MANAGEMENT
+// ============================================================================
+
+export async function getAdminProfile(): Promise<AdminProfile> {
+  syncClientStorage();
+  return memoryAdminProfile || DEFAULT_ADMIN_PROFILE;
+}
+
+export async function updateAdminProfile(updates: Partial<AdminProfile>): Promise<AdminProfile> {
+  syncClientStorage();
+  memoryAdminProfile = {
+    ...memoryAdminProfile,
+    ...updates,
+    updated_at: new Date().toISOString(),
+  };
+  saveClientStorage();
+  return memoryAdminProfile;
+}
+
 
 // ============================================================================
 // 1. EVENTS API
 // ============================================================================
 
-export async function getEvents(): Promise<EventItem[]> {
+export async function getEvents(includeArchived: boolean = false): Promise<EventItem[]> {
   const client = getClient();
   if (client) {
     try {
@@ -370,7 +281,7 @@ export async function getEvents(): Promise<EventItem[]> {
         const { data: regData } = await client.from('registrations').select('event_id, status');
         const { data: attData } = await client.from('attendance').select('event_id');
 
-        return events.map((ev: any) => {
+        const mapped = events.map((ev: any) => {
           const evRegs = (regData || []).filter((r: any) => r.event_id === ev.id);
           const evAtts = (attData || []).filter((a: any) => a.event_id === ev.id);
           return {
@@ -380,24 +291,114 @@ export async function getEvents(): Promise<EventItem[]> {
             checkins_count: evAtts.length,
           };
         });
+
+        return includeArchived ? mapped : mapped.filter((e: any) => !e.is_archived);
       }
     } catch (err) {
       console.error('Supabase getEvents error:', err);
     }
   }
 
+  // Client runtime: always query /api/events so changes made anywhere are instantly visible
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/events');
+      if (res.ok) {
+        const events = await res.json();
+        if (Array.isArray(events)) {
+          memoryEvents = events;
+          saveClientStorage();
+          return includeArchived ? events : events.filter((e: any) => !e.is_archived);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to fetch events from /api/events, using local storage cache:', e);
+    }
+  }
+
   syncClientStorage();
-  return memoryEvents;
+  const list = memoryEvents.filter(e => includeArchived || !e.is_archived);
+  return list;
 }
 
+export async function deleteEvent(eventId: string, permanent: boolean = false): Promise<boolean> {
+  // If running on client, delegate to DELETE /api/events to update server database
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch(`/api/events?id=${encodeURIComponent(eventId)}&permanent=${permanent}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        const idx = memoryEvents.findIndex(e => e.id === eventId || e.slug === eventId);
+        if (idx !== -1) {
+          if (permanent) memoryEvents.splice(idx, 1);
+          else memoryEvents[idx] = { ...memoryEvents[idx], status: 'CLOSED', is_archived: true };
+          saveClientStorage();
+        }
+        return true;
+      }
+    } catch (e) {
+      console.warn('Failed to delete event via API:', e);
+    }
+  }
+
+  const client = getClient(true);
+  if (client) {
+    try {
+      if (permanent) {
+        const { error } = await client.from('events').delete().or(`id.eq.${eventId},slug.eq.${eventId}`);
+        if (error) throw error;
+      } else {
+        // Safe archive/deactivate approach per guideline #6
+        const { error } = await client.from('events').update({ status: 'CLOSED' }).or(`id.eq.${eventId},slug.eq.${eventId}`);
+        if (error) throw error;
+      }
+    } catch (err) {
+      console.error('Supabase deleteEvent error:', err);
+    }
+  }
+
+  syncClientStorage();
+  const idx = memoryEvents.findIndex(e => e.id === eventId || e.slug === eventId);
+  if (idx !== -1) {
+    const ev = memoryEvents[idx];
+    if (permanent) {
+      memoryEvents.splice(idx, 1);
+      // Clean up dependent records safely to prevent orphaned data
+      memoryRegistrations = memoryRegistrations.filter(r => r.event_id !== ev.id && r.event_id !== ev.slug);
+      memoryCertificates = memoryCertificates.filter(c => c.event_id !== ev.id && c.event_id !== ev.slug);
+      memoryEvaluations = memoryEvaluations.filter(e => e.event_id !== ev.id && e.event_id !== ev.slug);
+    } else {
+      // Safe archival/removal from active listings while preserving historical attendance/certificates
+      memoryEvents[idx] = {
+        ...ev,
+        status: 'CLOSED',
+        is_archived: true
+      };
+    }
+    saveClientStorage();
+    return true;
+  }
+  return false;
+}
+
+
 export async function getEventBySlug(slug: string): Promise<EventItem | null> {
+  if (!slug) return null;
+  const rawSlug = String(slug).trim();
+  let decodedSlug = rawSlug;
+  try {
+    decodedSlug = decodeURIComponent(rawSlug).trim();
+  } catch {}
+  const normalizedSlug = decodedSlug.toLowerCase();
+
   const client = getClient();
   if (client) {
     try {
       const { data: event, error } = await client
         .from('events')
         .select('*')
-        .or(`slug.eq.${slug},id.eq.${slug}`)
+        .or(`slug.eq.${rawSlug},id.eq.${rawSlug},slug.eq.${decodedSlug},id.eq.${decodedSlug}`)
         .maybeSingle();
 
       if (error) throw error;
@@ -430,17 +431,67 @@ export async function getEventBySlug(slug: string): Promise<EventItem | null> {
     }
   }
 
+  // Client runtime: always query server API so incognito or different browsers load real events
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch(`/api/events?slug=${encodeURIComponent(rawSlug)}`);
+      if (res.ok) {
+        const serverEvent = await res.json();
+        if (serverEvent && (serverEvent.id || serverEvent.slug)) {
+          const idx = memoryEvents.findIndex(e => e.id === serverEvent.id || e.slug === serverEvent.slug);
+          if (idx >= 0) memoryEvents[idx] = serverEvent;
+          else memoryEvents.unshift(serverEvent);
+          saveClientStorage();
+          return serverEvent;
+        }
+      }
+    } catch (err) {
+      console.warn('Client fetch /api/events?slug error, checking local storage:', err);
+    }
+  }
+
+  // Server runtime or local fallback
   syncClientStorage();
-  return memoryEvents.find((e) => e.slug === slug || e.id === slug) || null;
+  return memoryEvents.find((e) => {
+    if (!e) return false;
+    if (e.id === rawSlug || e.id === decodedSlug) return true;
+    if (e.slug === rawSlug || e.slug === decodedSlug) return true;
+    if (e.slug?.toLowerCase() === normalizedSlug) return true;
+    if (decodeURIComponent(e.slug || '').toLowerCase() === normalizedSlug) return true;
+    if (e.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') === normalizedSlug) return true;
+    return false;
+  }) || null;
 }
 
 export async function createEvent(eventData: Omit<EventItem, 'id'>): Promise<EventItem> {
-  const client = getClient(true);
+  // If running on client, delegate to POST /api/events so event is persisted to server data store
+  if (typeof window !== 'undefined') {
+    const res = await fetch('/api/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(eventData),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'EVENT_CREATION_FAILED' }));
+      throw new Error(err.error || 'Failed to create event on server');
+    }
+    const created: EventItem = await res.json();
+    const idx = memoryEvents.findIndex(e => e.id === created.id || e.slug === created.slug);
+    if (idx >= 0) memoryEvents[idx] = created;
+    else memoryEvents.unshift(created);
+    saveClientStorage();
+    return created;
+  }
 
+  // Server runtime:
+  const client = getClient(true);
   if (client) {
     try {
       // Ensure unique slug
-      let baseSlug = eventData.slug;
+      let baseSlug = (eventData.slug || eventData.name)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '') || 'event';
       let finalSlug = baseSlug;
       let counter = 1;
 
@@ -497,17 +548,35 @@ export async function createEvent(eventData: Omit<EventItem, 'id'>): Promise<Eve
     }
   }
 
+  // Server disk/memory persistence:
+  loadDiskStorage();
+
+  // Normalize and ensure unique slug
+  let baseSlug = (eventData.slug || eventData.name)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '') || 'event';
+  let finalSlug = baseSlug;
+  let counter = 1;
+
+  while (memoryEvents.some(e => e.slug?.toLowerCase() === finalSlug.toLowerCase())) {
+    counter++;
+    finalSlug = `${baseSlug}-${counter}`;
+  }
+
   const newId = `ev_${Date.now().toString(36)}`;
   const newEvent: EventItem = {
     ...eventData,
     id: newId,
+    slug: finalSlug,
     created_at: new Date().toISOString(),
     registered_count: 0,
     verified_count: 0,
     checkins_count: 0
   };
+
   memoryEvents.unshift(newEvent);
-  saveClientStorage();
+  saveDiskStorage();
   return newEvent;
 }
 
@@ -518,7 +587,8 @@ export async function createEvent(eventData: Omit<EventItem, 'id'>): Promise<Eve
 export async function getRegistrations(
   filter: 'ALL' | 'PENDING' | 'VERIFIED' | 'REJECTED' = 'ALL',
   eventId?: string,
-  search?: string
+  search?: string,
+  studentId?: string
 ): Promise<RegistrationItem[]> {
   const client = getClient();
 
@@ -542,6 +612,10 @@ export async function getRegistrations(
         query = query.eq('status', filter);
       }
 
+      if (studentId) {
+        query = query.or(`student_id.eq.${studentId},email.ilike.${studentId}`);
+      }
+
       if (search && search.trim()) {
         const q = search.trim();
         query = query.or(`name.ilike.%${q}%,student_id.ilike.%${q}%,email.ilike.%${q}%,registration_number.ilike.%${q}%`);
@@ -551,9 +625,12 @@ export async function getRegistrations(
       if (error) throw error;
 
       if (data) {
+        syncClientStorage();
         return data.map((r: any) => {
           const pass = Array.isArray(r.passes) ? r.passes[0] : r.passes;
           const att = Array.isArray(r.attendance) ? r.attendance[0] : r.attendance;
+          const evalItem = memoryEvaluations.find(e => e.registration_id === r.id);
+          const cert = memoryCertificates.find(c => c.registration_id === r.id);
           return {
             ...r,
             event_name: r.events?.name || 'Campus Event',
@@ -562,6 +639,12 @@ export async function getRegistrations(
             checked_in: Boolean(att),
             checkin_time: att ? new Date(att.checked_in_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : null,
             gate: att?.gate || null,
+            marks: evalItem?.marks ?? r.marks ?? null,
+            feedback: evalItem?.feedback ?? r.feedback ?? null,
+            result: evalItem?.result ?? r.result ?? undefined,
+            certificate_eligible: evalItem?.certificate_eligible ?? r.certificate_eligible ?? false,
+            certificate_issued: Boolean(cert),
+            certificate_id: cert?.id || null,
           };
         });
       }
@@ -570,8 +653,32 @@ export async function getRegistrations(
     }
   }
 
+  // Client runtime: always query /api/registrations so client sees server persisted registrations
+  if (typeof window !== 'undefined') {
+    try {
+      const sp = new URLSearchParams();
+      if (filter && filter !== 'ALL') sp.set('filter', filter);
+      if (eventId && eventId !== 'ALL') sp.set('eventId', eventId);
+      if (search && search.trim()) sp.set('search', search.trim());
+      if (studentId) sp.set('studentId', studentId);
+      const res = await fetch(`/api/registrations?${sp.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          return data;
+        }
+      }
+    } catch (e) {
+      console.warn('getRegistrations API fetch error:', e);
+    }
+  }
+
   syncClientStorage();
   let list = [...memoryRegistrations];
+
+  if (studentId) {
+    list = list.filter(r => r.student_id === studentId || r.email.toLowerCase() === studentId.toLowerCase());
+  }
 
   if (eventId && eventId !== 'ALL') {
     list = list.filter(r => r.event_id === eventId || r.event_name?.toLowerCase().includes(eventId.toLowerCase()));
@@ -592,13 +699,25 @@ export async function getRegistrations(
   }
 
   return list.map(r => {
-    if (!r.events) {
+    const evalItem = memoryEvaluations.find(e => e.registration_id === r.id);
+    const cert = memoryCertificates.find(c => c.registration_id === r.id);
+    const item = {
+      ...r,
+      marks: evalItem?.marks ?? r.marks ?? null,
+      feedback: evalItem?.feedback ?? r.feedback ?? null,
+      result: evalItem?.result ?? r.result ?? undefined,
+      certificate_eligible: evalItem?.certificate_eligible ?? r.certificate_eligible ?? false,
+      certificate_issued: Boolean(cert),
+      certificate_id: cert?.id || null,
+    };
+    if (!item.events) {
       const ev = memoryEvents.find(e => e.id === r.event_id || e.slug === r.event_id);
-      return { ...r, events: ev };
+      return { ...item, events: ev };
     }
-    return r;
+    return item;
   });
 }
+
 
 export async function getRegistrationByAccessToken(token: string): Promise<RegistrationItem | null> {
   const client = getClient();
@@ -643,7 +762,8 @@ export async function createRegistration(data: {
   event_id: string;
   name: string;
   student_id: string;
-  college: string;
+  college?: string;
+  branch?: string;
   course: string;
   semester: string;
   email: string;
@@ -667,6 +787,9 @@ export async function createRegistration(data: {
   if (!emailRegex.test(data.email.trim())) {
     throw new Error('INVALID_FORM_DATA: Please provide a valid institutional email address.');
   }
+
+  const fixedCollege = 'SHEAT College of Engineering';
+  const selectedBranch = data.branch?.trim() || undefined;
 
   const client = getClient(true);
 
@@ -720,7 +843,8 @@ export async function createRegistration(data: {
           registration_number: regNumber,
           name: data.name.trim(),
           student_id: data.student_id.trim(),
-          college: data.college?.trim() || 'Apex Institute of Technology',
+          college: fixedCollege,
+          branch: selectedBranch,
           course: data.course.trim(),
           semester: data.semester.trim(),
           email: data.email.trim(),
@@ -750,9 +874,24 @@ export async function createRegistration(data: {
     }
   }
 
-  // In-memory fallback path
+  // In-memory / disk storage fallback path
   syncClientStorage();
-  const event = memoryEvents.find(e => e.id === data.event_id || e.slug === data.event_id);
+  const rawTarget = String(data.event_id || '').trim();
+  let decodedTarget = rawTarget;
+  try {
+    decodedTarget = decodeURIComponent(rawTarget).trim();
+  } catch {}
+  const normalizedTarget = decodedTarget.toLowerCase();
+
+  const event = memoryEvents.find(e => {
+    if (!e) return false;
+    if (e.id === rawTarget || e.id === decodedTarget) return true;
+    if (e.slug === rawTarget || e.slug === decodedTarget) return true;
+    if (e.slug?.toLowerCase() === normalizedTarget) return true;
+    if (decodeURIComponent(e.slug || '').toLowerCase() === normalizedTarget) return true;
+    if (e.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') === normalizedTarget) return true;
+    return false;
+  });
   if (!event) throw new Error('EVENT_NOT_FOUND: Event does not exist');
 
   if (event.status === 'CLOSED') {
@@ -791,7 +930,8 @@ export async function createRegistration(data: {
     registration_number: regNumber,
     name: data.name,
     student_id: data.student_id,
-    college: data.college || 'Apex Institute of Technology',
+    college: fixedCollege,
+    branch: selectedBranch,
     course: data.course,
     semester: data.semester,
     email: data.email,
@@ -892,6 +1032,23 @@ export async function verifyRegistration(registrationId: string): Promise<Regist
     }
   }
 
+  // Client runtime: delegate to POST /api/registrations/verify
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/registrations/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ registrationId }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        return updated;
+      }
+    } catch (e) {
+      console.warn('verifyRegistration API fetch error:', e);
+    }
+  }
+
   // In-memory fallback
   syncClientStorage();
   const reg = memoryRegistrations.find(r => r.id === registrationId);
@@ -943,6 +1100,23 @@ export async function rejectRegistration(registrationId: string, reason: string)
     } catch (err: any) {
       console.error('Supabase rejectRegistration error:', err);
       throw err;
+    }
+  }
+
+  // Client runtime: delegate to POST /api/registrations/reject
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/registrations/reject', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ registrationId, reason }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        return updated;
+      }
+    } catch (e) {
+      console.warn('rejectRegistration API fetch error:', e);
     }
   }
 
@@ -1353,7 +1527,7 @@ export async function getCertificates(): Promise<CertificateItem[]> {
           certificate_url: c.certificate_url,
           role: c.role || 'Delegate Participant',
           event_name: c.events?.name || 'Campus Event',
-          student_name: c.registrations?.name || 'Alex Chen',
+          student_name: c.registrations?.name || 'Ashutosh Dixit',
           event_date: c.events?.date || '2026-10-24',
           issued_at: c.issued_at
         }));
@@ -1444,6 +1618,405 @@ export async function issueCertificatesForEvent(eventId: string): Promise<number
   return count;
 }
 
+export async function issueCertificateForParticipant(data: {
+  registrationId: string;
+  eventId: string;
+  role?: string;
+  marks?: number | null;
+  result?: string;
+}): Promise<CertificateItem> {
+  const client = getClient(true);
+  const targetRole = data.role || data.result || 'Delegate Participant';
+
+  if (client) {
+    try {
+      // Check if certificate already exists
+      const { data: existing } = await client
+        .from('certificates')
+        .select('*')
+        .eq('registration_id', data.registrationId)
+        .maybeSingle();
+
+      if (existing) {
+        return existing;
+      }
+
+      // Fetch registration details
+      const { data: reg } = await client
+        .from('registrations')
+        .select('name, student_id, event_id, events(name, slug)')
+        .eq('id', data.registrationId)
+        .single();
+
+      const studentId = reg?.student_id || '0000';
+      const certNumber = `CERT-2026-TN-${studentId.slice(-4)}`;
+      const newCert = {
+        id: `cert_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        event_id: data.eventId,
+        registration_id: data.registrationId,
+        certificate_number: certNumber,
+        role: targetRole,
+        issued_at: new Date().toISOString()
+      };
+
+      const { data: inserted, error } = await client
+        .from('certificates')
+        .insert([newCert])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return inserted;
+    } catch (err) {
+      console.error('Supabase issueCertificateForParticipant error:', err);
+    }
+  }
+
+  syncClientStorage();
+  const existing = memoryCertificates.find(c => c.registration_id === data.registrationId);
+  if (existing) {
+    existing.role = targetRole;
+    existing.result = data.result || targetRole;
+    if (data.marks !== undefined) existing.marks = data.marks;
+    saveClientStorage();
+    return existing;
+  }
+
+  const reg = memoryRegistrations.find(r => r.id === data.registrationId);
+  const ev = memoryEvents.find(e => e.id === data.eventId || e.slug === data.eventId);
+  const studentId = reg?.student_id || '0000';
+  const certNumber = `CERT-2026-TN-${studentId.slice(-4)}`;
+
+  const newCert: CertificateItem = {
+    id: `cert_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+    event_id: data.eventId,
+    registration_id: data.registrationId,
+    certificate_number: certNumber,
+    role: targetRole,
+    result: data.result || targetRole,
+    marks: data.marks,
+    event_name: reg?.event_name || ev?.name || 'Campus Event',
+    student_name: reg?.name || 'Ashutosh Dixit',
+    event_date: ev?.date || 'Oct 24, 2026',
+    issued_at: new Date().toISOString()
+  };
+
+  memoryCertificates.unshift(newCert);
+  saveClientStorage();
+  return newCert;
+}
+
+// ============================================================================
+// 8. STUDENT ACCOUNTS API (PASSWORDS EXCLUDED FROM CLIENT RESPONSES)
+// ============================================================================
+
+export async function getStudents(): Promise<Omit<StudentAccount, 'password'>[]> {
+  const client = getClient();
+  if (client) {
+    try {
+      const { data, error } = await client
+        .from('student_accounts')
+        .select('id, full_name, student_id, email, course, college, phone, created_at');
+      if (error) throw error;
+      if (data && data.length > 0) {
+        return data.map((d: any) => ({
+          ...d,
+          name: d.full_name || d.name,
+        }));
+      }
+    } catch (err) {
+      console.error('Supabase getStudents error:', err);
+    }
+  }
+
+  syncClientStorage();
+  return memoryStudents.map(({ password, ...safe }) => ({
+    ...safe,
+    name: safe.name || safe.full_name,
+  }));
+}
+
+export async function getStudentByEmailOrId(identifier: string): Promise<Omit<StudentAccount, 'password'> | null> {
+  const trimmed = identifier.trim().toLowerCase();
+  const client = getClient();
+
+  if (client) {
+    try {
+      const { data, error } = await client
+        .from('student_accounts')
+        .select('id, full_name, student_id, email, course, college, phone, created_at')
+        .or(`student_id.eq.${trimmed},email.ilike.${trimmed}`)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (data) {
+        return {
+          ...data,
+          name: data.full_name,
+        };
+      }
+    } catch (err) {
+      console.error('Supabase getStudentByEmailOrId error:', err);
+    }
+  }
+
+  syncClientStorage();
+  const found = memoryStudents.find(
+    s => s.student_id.toLowerCase() === trimmed || s.email.toLowerCase() === trimmed
+  );
+  if (found) {
+    const { password, ...safe } = found;
+    return {
+      ...safe,
+      name: safe.name || safe.full_name,
+    };
+  }
+  return null;
+}
+
+export async function createStudentAccount(
+  data: Omit<StudentAccount, 'id' | 'created_at'>
+): Promise<Omit<StudentAccount, 'password'>> {
+  const client = getClient(true);
+  const cleanId = data.student_id.trim();
+  const cleanEmail = data.email.trim().toLowerCase();
+  const fixedCollege = 'SHEAT College of Engineering';
+  const selectedBranch = data.branch?.trim() || undefined;
+
+  // Check duplicate
+  syncClientStorage();
+  const existingMemory = memoryStudents.find(
+    s => s.student_id.toLowerCase() === cleanId.toLowerCase() || s.email.toLowerCase() === cleanEmail
+  );
+  if (existingMemory) {
+    throw new Error('DUPLICATE_STUDENT: A student account with this Student ID or Email already exists.');
+  }
+
+  if (client) {
+    try {
+      const { data: existingDb } = await client
+        .from('student_accounts')
+        .select('id')
+        .or(`student_id.eq.${cleanId},email.ilike.${cleanEmail}`)
+        .maybeSingle();
+
+      if (existingDb) {
+        throw new Error('DUPLICATE_STUDENT: A student account with this Student ID or Email already exists.');
+      }
+
+      const newId = `stu_${Date.now().toString(36)}`;
+      const studentName = (data.full_name || data.name || '').trim();
+      const { data: inserted, error } = await client
+        .from('student_accounts')
+        .insert([{
+          id: newId,
+          full_name: studentName,
+          student_id: cleanId,
+          email: cleanEmail,
+          course: data.course.trim(),
+          college: fixedCollege,
+          branch: selectedBranch,
+          phone: data.phone?.trim() || '',
+          password: data.password || 'password123',
+        }])
+        .select('id, full_name, student_id, email, course, college, branch, phone, created_at')
+        .single();
+
+      if (error) throw error;
+      if (inserted) {
+        const studentObj: StudentAccount = {
+          ...inserted,
+          name: studentName,
+          branch: selectedBranch,
+          password: data.password || 'password123'
+        };
+        memoryStudents.unshift(studentObj);
+        saveClientStorage();
+        return {
+          ...inserted,
+          name: studentName,
+          branch: selectedBranch,
+        };
+      }
+    } catch (err: any) {
+      if (err.message?.includes('DUPLICATE_STUDENT')) throw err;
+      console.error('Supabase createStudentAccount error:', err);
+    }
+  }
+
+  const studentName = (data.full_name || data.name || '').trim();
+  const newAccount: StudentAccount = {
+    id: `stu_${Date.now().toString(36)}`,
+    name: studentName,
+    full_name: studentName,
+    student_id: cleanId,
+    email: cleanEmail,
+    course: data.course.trim(),
+    college: fixedCollege,
+    branch: selectedBranch,
+    phone: data.phone?.trim() || '',
+    password: data.password || 'password123',
+    created_at: new Date().toISOString()
+  };
+
+  memoryStudents.unshift(newAccount);
+  saveClientStorage();
+
+  const { password, ...safe } = newAccount;
+  return safe;
+}
+
+export async function verifyStudentLogin(
+  identifier: string,
+  pass: string
+): Promise<Omit<StudentAccount, 'password'> | null> {
+  const trimmed = identifier.trim().toLowerCase();
+  const client = getClient(true);
+
+  if (client) {
+    try {
+      const { data, error } = await client
+        .from('student_accounts')
+        .select('*')
+        .or(`student_id.eq.${trimmed},email.ilike.${trimmed}`)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (data) {
+        if (data.password === pass) {
+          const { password, ...safe } = data;
+          return safe;
+        }
+        return null;
+      }
+    } catch (err) {
+      console.error('Supabase verifyStudentLogin error:', err);
+    }
+  }
+
+  syncClientStorage();
+  const found = memoryStudents.find(
+    s => s.student_id.toLowerCase() === trimmed || s.email.toLowerCase() === trimmed
+  );
+
+  if (found && found.password === pass) {
+    const { password, ...safe } = found;
+    return safe;
+  }
+  return null;
+}
+
+// ============================================================================
+// 9. EVALUATION & JUDGING API
+// ============================================================================
+
+export async function getEvaluations(eventId: string): Promise<EvaluationItem[]> {
+  const client = getClient();
+  if (client) {
+    try {
+      const { data, error } = await client
+        .from('evaluations')
+        .select('*')
+        .eq('event_id', eventId);
+
+      if (error) throw error;
+      if (data && data.length > 0) return data;
+    } catch (err) {
+      console.error('Supabase getEvaluations error:', err);
+    }
+  }
+
+  syncClientStorage();
+  return memoryEvaluations.filter(e => e.event_id === eventId);
+}
+
+export async function saveEvaluation(data: {
+  event_id: string;
+  registration_id: string;
+  student_id: string;
+  student_name?: string;
+  course?: string;
+  marks?: number | null;
+  feedback?: string | null;
+  result?: EvaluationResult;
+  certificate_eligible?: boolean;
+}): Promise<EvaluationItem> {
+  const client = getClient(true);
+
+  if (client) {
+    try {
+      const { data: upserted, error } = await client
+        .from('evaluations')
+        .upsert({
+          event_id: data.event_id,
+          registration_id: data.registration_id,
+          student_id: data.student_id,
+          marks: data.marks !== undefined ? data.marks : null,
+          feedback: data.feedback !== undefined ? data.feedback : null,
+          result: data.result || 'PARTICIPANT',
+          certificate_eligible: data.certificate_eligible ?? false,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'event_id,registration_id' })
+        .select()
+        .single();
+
+      if (error) throw error;
+      if (upserted) {
+        syncClientStorage();
+        const idx = memoryEvaluations.findIndex(
+          e => e.event_id === data.event_id && e.registration_id === data.registration_id
+        );
+        if (idx !== -1) {
+          memoryEvaluations[idx] = { ...memoryEvaluations[idx], ...upserted };
+        } else {
+          memoryEvaluations.unshift(upserted);
+        }
+        saveClientStorage();
+        return upserted;
+      }
+    } catch (err) {
+      console.error('Supabase saveEvaluation error:', err);
+    }
+  }
+
+  syncClientStorage();
+  const idx = memoryEvaluations.findIndex(
+    e => e.event_id === data.event_id && e.registration_id === data.registration_id
+  );
+
+  const evalItem: EvaluationItem = {
+    id: idx !== -1 ? memoryEvaluations[idx].id : `eval_${Date.now().toString(36)}`,
+    event_id: data.event_id,
+    registration_id: data.registration_id,
+    student_id: data.student_id,
+    student_name: data.student_name,
+    course: data.course,
+    marks: data.marks !== undefined ? data.marks : null,
+    feedback: data.feedback !== undefined ? data.feedback : null,
+    result: data.result || 'PARTICIPANT',
+    certificate_eligible: data.certificate_eligible ?? false,
+    updated_at: new Date().toISOString()
+  };
+
+  if (idx !== -1) {
+    memoryEvaluations[idx] = evalItem;
+  } else {
+    memoryEvaluations.unshift(evalItem);
+  }
+
+  // Also update corresponding registration item in memory
+  const reg = memoryRegistrations.find(r => r.id === data.registration_id);
+  if (reg) {
+    reg.marks = evalItem.marks;
+    reg.feedback = evalItem.feedback;
+    reg.result = evalItem.result;
+    reg.certificate_eligible = evalItem.certificate_eligible;
+  }
+
+  saveClientStorage();
+  return evalItem;
+}
+
 // ============================================================================
 // 7. DASHBOARD STATS (100% REAL DYNAMIC COUNTS)
 // ============================================================================
@@ -1491,8 +2064,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   }
 
   syncClientStorage();
-  const totalEvents = memoryEvents.length;
-  const upcomingEvents = memoryEvents.filter(e => e.event_status === 'UPCOMING' || e.event_status === 'LIVE').length;
+  const totalEvents = memoryEvents.filter(e => !e.is_archived).length;
+  const upcomingEvents = memoryEvents.filter(e => !e.is_archived && (e.event_status === 'UPCOMING' || e.event_status === 'LIVE')).length;
   const totalRegistrations = memoryRegistrations.length;
   const pendingVerifications = memoryRegistrations.filter(r => r.status === 'PENDING').length;
   const verifiedStudents = memoryRegistrations.filter(r => r.status === 'VERIFIED').length;
@@ -1513,8 +2086,12 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 }
 
 export function resetDemoState() {
-  memoryEvents = JSON.parse(JSON.stringify(INITIAL_EVENTS));
-  memoryRegistrations = JSON.parse(JSON.stringify(INITIAL_REGISTRATIONS));
-  memoryCertificates = JSON.parse(JSON.stringify(INITIAL_CERTIFICATES));
+  memoryEvents = [];
+  memoryRegistrations = [];
+  memoryCertificates = [];
+  memoryStudents = [];
+  memoryEvaluations = [];
+  memoryAdminProfile = JSON.parse(JSON.stringify(DEFAULT_ADMIN_PROFILE));
   saveClientStorage();
 }
+

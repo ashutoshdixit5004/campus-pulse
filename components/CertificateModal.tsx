@@ -79,7 +79,7 @@ export default function CertificateModal({
               marginBottom: '0.5rem',
             }}
           >
-            APEX INSTITUTE OF TECHNOLOGY &bull; CAMPUS PULSE
+            SHEAT College of Engineering &bull; CAMPUS PULSE
           </div>
           <h2 style={{ fontSize: '32px', letterSpacing: '-0.02em', marginBottom: '0.75rem' }}>
             CERTIFICATE OF PARTICIPATION

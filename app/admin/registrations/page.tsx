@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { getRegistrations, getEvents, verifyRegistration, rejectRegistration } from '@/lib/db';
-import { RegistrationItem, EventItem } from '@/types/database';
+import { RegistrationItem, EventItem, formatBranch } from '@/types/database';
 import StatusBadge from '@/components/StatusBadge';
 import VerificationDrawer from '@/components/VerificationDrawer';
 import { useToast } from '@/components/ToastProvider';
@@ -198,11 +198,26 @@ export default function AdminRegistrationsPage({
                   <tr key={reg.id}>
                     <td>
                       <div className="table-title">{reg.name}</div>
-                      <div className="table-subtitle">{reg.college || 'Apex Institute'}</div>
+                      <div className="table-subtitle">
+                        {reg.college || 'SHEAT College of Engineering'}
+                        {reg.branch && (
+                          <span
+                            className="mono-tag"
+                            style={{
+                              marginLeft: '6px',
+                              fontSize: '10px',
+                              color: 'var(--accent-cyan)',
+                              borderColor: 'rgba(0, 240, 255, 0.3)',
+                            }}
+                          >
+                            {formatBranch(reg.branch)}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td style={{ fontFamily: 'var(--font-mono)' }}>{reg.student_id}</td>
                     <td style={{ fontSize: '12px', color: 'var(--accent-orange)', fontWeight: 600 }}>
-                      {reg.event_name || 'Technova 2026'}
+                      {reg.event_name || 'Campus Event'}
                     </td>
                     <td>{reg.course}</td>
                     <td style={{ fontSize: '12px', color: 'var(--text-muted)' }}>

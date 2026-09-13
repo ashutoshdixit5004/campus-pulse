@@ -61,7 +61,7 @@ async function runTests() {
     event_id: createdEvent.slug,
     name: 'Jordan Rivera',
     student_id: `STU-2024-${Math.floor(1000 + Math.random() * 9000)}`,
-    college: 'Apex Institute of Technology',
+    college: 'SHEAT College of Engineering',
     course: 'B.Tech Cybersecurity',
     semester: 'Year 3 // Sem 5',
     email: `jordan.rivera.${Date.now()}@campus.edu`,

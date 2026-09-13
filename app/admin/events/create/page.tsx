@@ -75,9 +75,10 @@ export default function CreateEventPage() {
         rules,
       });
 
-      setCreatedSlug(finalSlug);
+      const canonicalSlug = newEv?.slug || finalSlug;
+      setCreatedSlug(canonicalSlug);
       setCreatedEvent(newEv);
-      showToast(`✓ Event Published! Unique link generated: /register/${finalSlug}`);
+      showToast(`✓ Event Published! Unique link generated: /register/${canonicalSlug}`);
     } catch (err) {
       console.error(err);
       showToast('Error creating event.', 'error');

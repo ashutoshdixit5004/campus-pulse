@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { getEvents, getRegistrations, getCertificates, issueCertificatesForEvent } from '@/lib/db';
-import { EventItem, RegistrationItem, CertificateItem } from '@/types/database';
+import { EventItem, RegistrationItem, CertificateItem, EvaluationResult, formatBranch } from '@/types/database';
 import StatusBadge from '@/components/StatusBadge';
 import { useToast } from '@/components/ToastProvider';
 import QrShareModal from '@/components/QrShareModal';
@@ -17,11 +17,21 @@ export default function AdminEventDetailPage() {
   const [event, setEvent] = useState<EventItem | null>(null);
   const [registrations, setRegistrations] = useState<RegistrationItem[]>([]);
   const [certificates, setCertificates] = useState<CertificateItem[]>([]);
-  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'REGISTRATION' | 'VERIFICATION' | 'ATTENDANCE' | 'CERTIFICATES'>('OVERVIEW');
+  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'REGISTRATION' | 'VERIFICATION' | 'ATTENDANCE' | 'CERTIFICATES' | 'EVALUATION'>('OVERVIEW');
   const [loading, setLoading] = useState(true);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [isDispatching, setIsDispatching] = useState(false);
+
+  // Evaluation Form state per registration
+  const [evalForm, setEvalForm] = useState<Record<string, {
+    marks: string;
+    feedback: string;
+    result: EvaluationResult;
+    eligible: boolean;
+  }>>({});
+  const [savingRegId, setSavingRegId] = useState<string | null>(null);
+  const [issuingRegId, setIssuingRegId] = useState<string | null>(null);
 
   const loadEventData = async () => {
     const [evs, allCerts] = await Promise.all([getEvents(), getCertificates()]);
@@ -31,9 +41,22 @@ export default function AdminEventDetailPage() {
       const regs = await getRegistrations('ALL', match.id);
       setRegistrations(regs);
       setCertificates(allCerts.filter((c) => c.event_id === match.id || c.event_id === match.slug));
+
+      // Populate evaluation state from registrations
+      const formMap: Record<string, { marks: string; feedback: string; result: EvaluationResult; eligible: boolean }> = {};
+      regs.forEach((r) => {
+        formMap[r.id] = {
+          marks: r.marks !== undefined && r.marks !== null ? String(r.marks) : '',
+          feedback: r.feedback || '',
+          result: (r.result as EvaluationResult) || 'PARTICIPANT',
+          eligible: r.certificate_eligible ?? (r.result === 'WINNER' || r.result === 'RUNNER-UP' || r.result === 'SECOND RUNNER-UP'),
+        };
+      });
+      setEvalForm(formMap);
     }
     setLoading(false);
   };
+
 
   useEffect(() => {
     loadEventData();
@@ -85,6 +108,71 @@ export default function AdminEventDetailPage() {
       setIsDispatching(false);
     }
   };
+
+  const handleSaveEvaluation = async (reg: RegistrationItem) => {
+    if (!event) return;
+    setSavingRegId(reg.id);
+    const form = evalForm[reg.id] || { marks: '', feedback: '', result: 'PARTICIPANT', eligible: false };
+
+    try {
+      const res = await fetch('/api/evaluations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_id: event.id,
+          registration_id: reg.id,
+          student_id: reg.student_id,
+          student_name: reg.name,
+          course: reg.course,
+          marks: form.marks !== '' ? Number(form.marks) : null,
+          feedback: form.feedback,
+          result: form.result,
+          certificate_eligible: form.eligible,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to save evaluation');
+
+      showToast(`✓ Evaluation saved for ${reg.name} [${form.result}]!`);
+      await loadEventData();
+    } catch (err: any) {
+      showToast(err.message || 'Error saving evaluation', 'error');
+    } finally {
+      setSavingRegId(null);
+    }
+  };
+
+  const handleIssueParticipantCertificate = async (reg: RegistrationItem) => {
+    if (!event) return;
+    setIssuingRegId(reg.id);
+    const form = evalForm[reg.id] || { marks: '', feedback: '', result: 'PARTICIPANT', eligible: false };
+
+    try {
+      const res = await fetch('/api/certificates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId: event.id,
+          registrationId: reg.id,
+          role: form.result === 'WINNER' ? 'WINNER' : form.result === 'RUNNER-UP' ? 'RUNNER-UP' : form.result === 'SECOND RUNNER-UP' ? 'SECOND RUNNER-UP' : 'Delegate Participant',
+          result: form.result,
+          marks: form.marks !== '' ? Number(form.marks) : null,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to issue certificate');
+
+      showToast(`✓ Certificate issued for ${reg.name} [${form.result}]!`);
+      await loadEventData();
+    } catch (err: any) {
+      showToast(err.message || 'Error issuing certificate', 'error');
+    } finally {
+      setIssuingRegId(null);
+    }
+  };
+
 
   if (loading) {
     return (
@@ -237,7 +325,15 @@ export default function AdminEventDetailPage() {
         >
           <i className="fa-solid fa-award"></i> CERTIFICATES ({certsCount})
         </button>
+        <button
+          className={`btn btn-secondary btn-sm ${activeTab === 'EVALUATION' ? 'active' : ''}`}
+          onClick={() => setActiveTab('EVALUATION')}
+          style={{ background: activeTab === 'EVALUATION' ? 'var(--accent-orange)' : undefined, color: activeTab === 'EVALUATION' ? '#000' : undefined, fontWeight: activeTab === 'EVALUATION' ? 700 : undefined }}
+        >
+          <i className="fa-solid fa-gavel"></i> EVALUATION / JUDGING ({totalRegs})
+        </button>
       </div>
+
 
       {/* 1. EVENT OVERVIEW */}
       {activeTab === 'OVERVIEW' && (
@@ -335,6 +431,7 @@ export default function AdminEventDetailPage() {
                       <th>Student</th>
                       <th>Student ID</th>
                       <th>Course</th>
+                      <th>Branch</th>
                       <th>Reg Number</th>
                       <th>Status</th>
                     </tr>
@@ -345,6 +442,11 @@ export default function AdminEventDetailPage() {
                         <td style={{ fontWeight: 600 }}>{r.name}</td>
                         <td style={{ fontFamily: 'var(--font-mono)' }}>{r.student_id}</td>
                         <td>{r.course}</td>
+                        <td>
+                          <span className="mono-tag" style={{ color: 'var(--accent-cyan)', fontSize: '10px' }}>
+                            {formatBranch(r.branch) || 'Babatpur'}
+                          </span>
+                        </td>
                         <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)' }}>{r.registration_number}</td>
                         <td><StatusBadge status={r.status} /></td>
                       </tr>
@@ -551,12 +653,285 @@ export default function AdminEventDetailPage() {
         </div>
       )}
 
+      {/* 6. EVALUATION / JUDGING */}
+      {activeTab === 'EVALUATION' && (
+        <div className="glass-panel" style={{ padding: '2rem' }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem',
+              flexWrap: 'wrap',
+              gap: '1rem',
+            }}
+          >
+            <div>
+              <div className="mono-tag" style={{ color: 'var(--accent-orange)', marginBottom: '0.25rem' }}>
+                COMPETITION JUDGING & MERIT AWARDS
+              </div>
+              <h3 style={{ fontSize: '20px', margin: 0 }}>Participant Evaluation & Results</h3>
+              <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                Grade performance, provide official feedback, declare podium winners, and grant individual certificate eligibility.
+              </p>
+            </div>
+
+            {/* Podium Winner Count summary */}
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <div style={{ padding: '0.5rem 0.85rem', background: 'rgba(255, 215, 0, 0.1)', border: '1px solid rgba(255, 215, 0, 0.3)', borderRadius: 'var(--radius-sm)', fontSize: '12px' }}>
+                <span style={{ color: '#ffd700', fontWeight: 700 }}>🥇 Winner: </span>
+                <span>{registrations.filter(r => (evalForm[r.id]?.result || r.result) === 'WINNER').length}</span>
+              </div>
+              <div style={{ padding: '0.5rem 0.85rem', background: 'rgba(192, 192, 192, 0.1)', border: '1px solid rgba(192, 192, 192, 0.3)', borderRadius: 'var(--radius-sm)', fontSize: '12px' }}>
+                <span style={{ color: '#c0c0c0', fontWeight: 700 }}>🥈 Runner-Up: </span>
+                <span>{registrations.filter(r => (evalForm[r.id]?.result || r.result) === 'RUNNER-UP').length}</span>
+              </div>
+              <div style={{ padding: '0.5rem 0.85rem', background: 'rgba(205, 127, 50, 0.1)', border: '1px solid rgba(205, 127, 50, 0.3)', borderRadius: 'var(--radius-sm)', fontSize: '12px' }}>
+                <span style={{ color: '#cd7f32', fontWeight: 700 }}>🥉 2nd Runner-Up: </span>
+                <span>{registrations.filter(r => (evalForm[r.id]?.result || r.result) === 'SECOND RUNNER-UP').length}</span>
+              </div>
+            </div>
+          </div>
+
+          {registrations.length > 0 ? (
+            <div className="table-container">
+              <table className="pulse-table">
+                <thead>
+                  <tr>
+                    <th>Participant Details</th>
+                    <th>Status</th>
+                    <th style={{ width: '110px' }}>Score / 100</th>
+                    <th>Judge Feedback</th>
+                    <th style={{ width: '180px' }}>Result / Position</th>
+                    <th style={{ width: '110px' }}>Cert Eligible</th>
+                    <th>Cert Status</th>
+                    <th style={{ textAlign: 'right', width: '190px' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {registrations.map((r) => {
+                    const form = evalForm[r.id] || { marks: '', feedback: '', result: 'PARTICIPANT', eligible: false };
+                    const isWinner = form.result === 'WINNER';
+                    const isRunnerUp = form.result === 'RUNNER-UP';
+                    const isSecondRunnerUp = form.result === 'SECOND RUNNER-UP';
+
+                    return (
+                      <tr
+                        key={r.id}
+                        style={{
+                          background: isWinner
+                            ? 'rgba(255, 215, 0, 0.04)'
+                            : isRunnerUp
+                            ? 'rgba(192, 192, 192, 0.04)'
+                            : isSecondRunnerUp
+                            ? 'rgba(205, 127, 50, 0.04)'
+                            : undefined,
+                        }}
+                      >
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ fontWeight: 700, color: '#fff', fontSize: '14px' }}>{r.name}</div>
+                            {isWinner && (
+                              <span
+                                style={{
+                                  padding: '2px 8px',
+                                  borderRadius: 'var(--radius-pill)',
+                                  background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(255, 153, 0, 0.2))',
+                                  border: '1px solid #ffd700',
+                                  color: '#ffd700',
+                                  fontSize: '10px',
+                                  fontWeight: 800,
+                                }}
+                              >
+                                🥇 WINNER
+                              </span>
+                            )}
+                            {isRunnerUp && (
+                              <span
+                                style={{
+                                  padding: '2px 8px',
+                                  borderRadius: 'var(--radius-pill)',
+                                  background: 'rgba(192, 192, 192, 0.2)',
+                                  border: '1px solid #c0c0c0',
+                                  color: '#c0c0c0',
+                                  fontSize: '10px',
+                                  fontWeight: 800,
+                                }}
+                              >
+                                🥈 RUNNER-UP
+                              </span>
+                            )}
+                            {isSecondRunnerUp && (
+                              <span
+                                style={{
+                                  padding: '2px 8px',
+                                  borderRadius: 'var(--radius-pill)',
+                                  background: 'rgba(205, 127, 50, 0.2)',
+                                  border: '1px solid #cd7f32',
+                                  color: '#cd7f32',
+                                  fontSize: '10px',
+                                  fontWeight: 800,
+                                }}
+                              >
+                                🥉 2ND RUNNER-UP
+                              </span>
+                            )}
+                          </div>
+                          <div className="table-subtitle">
+                            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)' }}>{r.student_id}</span> &bull; {r.course}
+                            {r.branch && (
+                              <span className="mono-tag" style={{ marginLeft: '6px', fontSize: '9px', color: 'var(--accent-cyan)' }}>
+                                {formatBranch(r.branch)}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <StatusBadge status={r.status} />
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              placeholder="Marks"
+                              className="form-input"
+                              style={{ width: '65px', padding: '0.35rem 0.45rem', textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: '13px' }}
+                              value={form.marks}
+                              onChange={(e) =>
+                                setEvalForm((prev) => ({
+                                  ...prev,
+                                  [r.id]: { ...(prev[r.id] || { feedback: '', result: 'PARTICIPANT', eligible: false }), marks: e.target.value },
+                                }))
+                              }
+                            />
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>/100</span>
+                          </div>
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            placeholder="Evaluation feedback..."
+                            className="form-input"
+                            style={{ width: '100%', minWidth: '160px', padding: '0.35rem 0.5rem', fontSize: '12px' }}
+                            value={form.feedback}
+                            onChange={(e) =>
+                              setEvalForm((prev) => ({
+                                ...prev,
+                                [r.id]: { ...(prev[r.id] || { marks: '', result: 'PARTICIPANT', eligible: false }), feedback: e.target.value },
+                              }))
+                            }
+                          />
+                        </td>
+                        <td>
+                          <select
+                            className="form-input"
+                            style={{ padding: '0.35rem 0.5rem', fontSize: '12px', fontWeight: 600 }}
+                            value={form.result}
+                            onChange={(e) => {
+                              const val = e.target.value as EvaluationResult;
+                              setEvalForm((prev) => ({
+                                ...prev,
+                                [r.id]: {
+                                  ...(prev[r.id] || { marks: '', feedback: '', eligible: false }),
+                                  result: val,
+                                  eligible: val !== 'NOT ELIGIBLE',
+                                },
+                              }));
+                            }}
+                          >
+                            <option value="WINNER">🥇 WINNER</option>
+                            <option value="RUNNER-UP">🥈 RUNNER-UP</option>
+                            <option value="SECOND RUNNER-UP">🥉 SECOND RUNNER-UP</option>
+                            <option value="PARTICIPANT">PARTICIPANT</option>
+                            <option value="NOT ELIGIBLE">NOT ELIGIBLE</option>
+                          </select>
+                        </td>
+                        <td>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12px' }}>
+                            <input
+                              type="checkbox"
+                              checked={form.eligible}
+                              onChange={(e) =>
+                                setEvalForm((prev) => ({
+                                  ...prev,
+                                  [r.id]: { ...(prev[r.id] || { marks: '', feedback: '', result: 'PARTICIPANT' }), eligible: e.target.checked },
+                                }))
+                              }
+                            />
+                            <span style={{ color: form.eligible ? 'var(--accent-emerald)' : 'var(--text-muted)', fontWeight: 600 }}>
+                              {form.eligible ? 'YES' : 'NO'}
+                            </span>
+                          </label>
+                        </td>
+                        <td>
+                          {r.certificate_issued ? (
+                            <span className="badge badge-verified" style={{ fontSize: '10px' }}>
+                              <i className="fa-solid fa-award"></i> ISSUED
+                            </span>
+                          ) : (
+                            <span className="badge badge-pending" style={{ fontSize: '10px' }}>
+                              NOT ISSUED
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              style={{ fontSize: '11px', padding: '0.35rem 0.6rem' }}
+                              onClick={() => handleSaveEvaluation(r)}
+                              disabled={savingRegId === r.id}
+                              title="Persist marks, feedback, position & eligibility"
+                            >
+                              {savingRegId === r.id ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-floppy-disk"></i>} Save
+                            </button>
+
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-sm"
+                              style={{ fontSize: '11px', padding: '0.35rem 0.6rem' }}
+                              onClick={() => handleIssueParticipantCertificate(r)}
+                              disabled={issuingRegId === r.id || !form.eligible || r.certificate_issued}
+                              title={
+                                r.certificate_issued
+                                  ? 'Certificate already issued'
+                                  : !form.eligible
+                                  ? 'Must be marked certificate eligible'
+                                  : 'Issue official certificate with current position'
+                              }
+                            >
+                              {issuingRegId === r.id ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-award"></i>} Issue Cert
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
+              <i className="fa-solid fa-users-slash" style={{ fontSize: '32px', marginBottom: '0.75rem', opacity: 0.5 }}></i>
+              <div style={{ fontSize: '16px', fontWeight: 600, color: '#fff' }}>No Participants Registered</div>
+              <p style={{ fontSize: '12px', marginTop: '4px' }}>
+                Students who register for this event will appear in this operational judging roster.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
       <QrShareModal
         isOpen={isQrModalOpen}
         onClose={() => setIsQrModalOpen(false)}
         eventTitle={event.name}
         registrationUrl={regUrl}
       />
+
     </section>
   );
 }

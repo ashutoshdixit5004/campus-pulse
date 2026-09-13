@@ -269,7 +269,7 @@ export default function StudentHomePage() {
         isOpen={isCertModalOpen}
         onClose={() => setIsCertModalOpen(false)}
         eventTitle={latestCert?.event_name || 'National E-Summit 2026'}
-        studentName={latestCert?.student_name || 'Alex Chen'}
+        studentName={latestCert?.student_name || 'Ashutosh Dixit'}
         role={latestCert?.role || 'Delegate Participant'}
         date={latestCert?.event_date || 'October 10, 2026'}
         authCode={latestCert?.certificate_number || 'CERT-2026-NES-0192'}

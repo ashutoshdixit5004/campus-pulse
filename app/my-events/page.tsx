@@ -4,7 +4,8 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import CertificateModal from '@/components/CertificateModal';
 import { getRegistrations } from '@/lib/db';
-import { RegistrationItem } from '@/types/database';
+import { getStudentSession, setStudentSession } from '@/lib/auth';
+import { RegistrationItem, StudentAccount } from '@/types/database';
 
 interface MyEventItem {
   id: string;
@@ -22,6 +23,7 @@ export default function MyEventsPage() {
   const [activeTab, setActiveTab] = useState('ALL');
   const [events, setEvents] = useState<MyEventItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentStudent, setCurrentStudent] = useState<StudentAccount | null>(null);
   const [certModalData, setCertModalData] = useState<{
     isOpen: boolean;
     title: string;
@@ -36,55 +38,158 @@ export default function MyEventsPage() {
     date: '',
   });
 
-  useEffect(() => {
-    getRegistrations('ALL').then((regs) => {
-      const mapped: MyEventItem[] = regs.map((r) => {
-        const isAttended = Boolean(r.checked_in);
-        const isVerified = r.status === 'VERIFIED';
-        const isPending = r.status === 'PENDING';
-        const isRejected = r.status === 'REJECTED';
+  const loadData = async () => {
+    setLoading(true);
+    const student = getStudentSession();
+    setCurrentStudent(student);
 
-        const tabs: string[] = [];
-        if (isVerified) tabs.push('VERIFIED');
-        if (isPending) tabs.push('PENDING');
-        if (isAttended) tabs.push('ATTENDED', 'COMPLETED');
-        if (!isAttended) tabs.push('UPCOMING');
+    const studentIdFilter = student?.student_id;
+    const regs = await getRegistrations('ALL', undefined, studentIdFilter);
 
-        return {
-          id: r.id,
-          name: r.event_name || 'Campus Event',
-          date: r.events?.date ? `${r.events.date} • ${r.events.start_time || '09:00'}` : 'Oct 24, 2026 • 09:00 AM',
-          venue: r.events?.venue || 'Campus Auditorium',
-          regStatus: r.status,
-          passStatus: isVerified ? (isAttended ? 'SCANNED' : 'READY') : 'LOCKED',
-          checkinStatus: isAttended ? 'ATTENDED' : (isVerified ? 'READY FOR ENTRY' : 'UNCONFIRMED'),
-          tabType: tabs,
-          registration: r,
-        };
-      });
+    // Filter strictly to current student if authenticated
+    const studentRegs = student
+      ? regs.filter(
+          (r) =>
+            r.student_id === student.student_id ||
+            (student.email && r.email?.toLowerCase() === student.email.toLowerCase())
+        )
+      : regs;
 
-      setEvents(mapped);
-      setLoading(false);
+    const mapped: MyEventItem[] = studentRegs.map((r) => {
+      const isAttended = Boolean(r.checked_in);
+      const isVerified = r.status === 'VERIFIED';
+      const isPending = r.status === 'PENDING';
+
+      const tabs: string[] = [];
+      if (isVerified) tabs.push('VERIFIED');
+      if (isPending) tabs.push('PENDING');
+      if (isAttended) tabs.push('ATTENDED', 'COMPLETED');
+      if (!isAttended) tabs.push('UPCOMING');
+      if (r.result && r.result !== 'PARTICIPANT' && r.result !== 'NOT ELIGIBLE') {
+        tabs.push('AWARDS');
+      }
+
+      return {
+        id: r.id,
+        name: r.event_name || 'Campus Event',
+        date: r.events?.date ? `${r.events.date} • ${r.events.start_time || '09:00'}` : 'Oct 24, 2026 • 09:00 AM',
+        venue: r.events?.venue || 'Campus Auditorium',
+        regStatus: r.status,
+        passStatus: isVerified ? (isAttended ? 'SCANNED' : 'READY') : 'LOCKED',
+        checkinStatus: isAttended ? 'ATTENDED' : isVerified ? 'READY FOR ENTRY' : 'UNCONFIRMED',
+        tabType: tabs,
+        registration: r,
+      };
     });
+
+    setEvents(mapped);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadData();
   }, []);
 
   const filtered = activeTab === 'ALL'
     ? events
     : events.filter((e) => e.tabType.includes(activeTab));
 
-  const tabs = ['ALL', 'PENDING', 'VERIFIED', 'UPCOMING', 'ATTENDED', 'COMPLETED'];
+  const tabs = ['ALL', 'PENDING', 'VERIFIED', 'UPCOMING', 'ATTENDED', 'AWARDS', 'COMPLETED'];
 
   return (
     <section className="view-section active">
       <div style={{ marginBottom: '2rem' }}>
         <div className="mono-tag" style={{ color: 'var(--accent-orange)', marginBottom: '0.25rem' }}>
-          STUDENT TRACKER
+          STUDENT TRACKER // ISOLATED DOSSIER
         </div>
         <h1 style={{ fontSize: '36px' }}>My Registered Events</h1>
         <p style={{ color: 'var(--text-muted)' }}>
-          Track your registration approvals, active passes, and verified attendance certificates in real time.
+          Track your personal registration approvals, active passes, and declared competition results in real time.
         </p>
       </div>
+
+      {/* Student Session Header */}
+      {currentStudent ? (
+        <div
+          style={{
+            padding: '1rem 1.25rem',
+            background: 'rgba(0, 240, 255, 0.04)',
+            border: '1px solid rgba(0, 240, 255, 0.2)',
+            borderRadius: 'var(--radius-sm)',
+            marginBottom: '2rem',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '1rem',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '50%',
+                background: 'rgba(0, 240, 255, 0.15)',
+                border: '1px solid var(--accent-cyan)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 700,
+                color: 'var(--accent-cyan)',
+                fontSize: '14px',
+              }}
+            >
+              {(currentStudent.name || currentStudent.full_name || 'S').charAt(0)}
+            </div>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: '14px' }}>
+                {currentStudent.name || currentStudent.full_name}{' '}
+                <span className="mono-tag" style={{ color: 'var(--accent-cyan)', fontSize: '10px' }}>
+                  {currentStudent.student_id}
+                </span>
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                {currentStudent.course} &bull; {currentStudent.college}
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <Link href="/profile" className="btn btn-secondary btn-sm" style={{ fontSize: '11px' }}>
+              <i className="fa-solid fa-user"></i> Full Dossier
+            </Link>
+          </div>
+        </div>
+      ) : (
+        <div
+          style={{
+            padding: '1rem 1.25rem',
+            background: 'rgba(245, 158, 11, 0.05)',
+            border: '1px solid rgba(245, 158, 11, 0.2)',
+            borderRadius: 'var(--radius-sm)',
+            marginBottom: '2rem',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '1rem',
+          }}
+        >
+          <div>
+            <div style={{ fontWeight: 600, color: 'var(--accent-amber)', fontSize: '13px' }}>
+              GUEST SESSION ACTIVE
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+              Sign in with your student account to isolate your registered events, passes, and competition scores.
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <Link href="/student/login" className="btn btn-primary btn-sm" style={{ fontSize: '11px' }}>
+              Sign In
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Lifecycle Tabs */}
       <div
@@ -128,6 +233,116 @@ export default function MyEventsPage() {
         }}
       >
         {filtered.map((ev) => {
+          const r = ev.registration;
+          const hasResult = Boolean(r.result || r.marks !== undefined || r.feedback);
+
+          // Badge style helper
+          const getResultBadge = () => {
+            if (!r.result) return null;
+            switch (r.result) {
+              case 'WINNER':
+                return (
+                  <span
+                    style={{
+                      background: 'rgba(234, 179, 8, 0.15)',
+                      border: '1px solid #eab308',
+                      color: '#facc15',
+                      padding: '3px 10px',
+                      borderRadius: '4px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      letterSpacing: '0.05em',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    🥇 WINNER
+                  </span>
+                );
+              case 'RUNNER-UP':
+                return (
+                  <span
+                    style={{
+                      background: 'rgba(226, 232, 240, 0.12)',
+                      border: '1px solid #cbd5e1',
+                      color: '#e2e8f0',
+                      padding: '3px 10px',
+                      borderRadius: '4px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      letterSpacing: '0.05em',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    🥈 RUNNER-UP
+                  </span>
+                );
+              case 'SECOND RUNNER-UP':
+                return (
+                  <span
+                    style={{
+                      background: 'rgba(217, 119, 6, 0.15)',
+                      border: '1px solid #b45309',
+                      color: '#f59e0b',
+                      padding: '3px 10px',
+                      borderRadius: '4px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      letterSpacing: '0.05em',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    🥉 SECOND RUNNER-UP
+                  </span>
+                );
+              case 'PARTICIPANT':
+                return (
+                  <span
+                    style={{
+                      background: 'rgba(59, 130, 246, 0.12)',
+                      border: '1px solid #3b82f6',
+                      color: '#60a5fa',
+                      padding: '3px 10px',
+                      borderRadius: '4px',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    🎖️ PARTICIPANT
+                  </span>
+                );
+              case 'NOT ELIGIBLE':
+                return (
+                  <span
+                    style={{
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      border: '1px solid #ef4444',
+                      color: '#f87171',
+                      padding: '3px 10px',
+                      borderRadius: '4px',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    ⛔ NOT ELIGIBLE
+                  </span>
+                );
+              default:
+                return null;
+            }
+          };
+
           return (
             <div
               key={ev.id}
@@ -151,9 +366,12 @@ export default function MyEventsPage() {
                   <div className="mono-tag" style={{ color: 'var(--accent-orange)', fontSize: '10px' }}>
                     CAMPUS EVENT
                   </div>
-                  <span className="mono-tag" style={{ color: 'var(--text-muted)' }}>
-                    {ev.regStatus}
-                  </span>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    {getResultBadge()}
+                    <span className="mono-tag" style={{ color: 'var(--text-muted)' }}>
+                      {ev.regStatus}
+                    </span>
+                  </div>
                 </div>
                 <h3 style={{ fontSize: '18px', marginBottom: '0.25rem' }}>{ev.name}</h3>
                 <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
@@ -162,6 +380,76 @@ export default function MyEventsPage() {
                 <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
                   <i className="fa-solid fa-location-dot" style={{ marginRight: '4px' }}></i> {ev.venue}
                 </p>
+
+                {/* Declared Evaluation Result Panel */}
+                {hasResult && (
+                  <div
+                    style={{
+                      marginTop: '1rem',
+                      padding: '0.85rem 1rem',
+                      background: '#121622',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      borderRadius: 'var(--radius-sm)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '0.5rem',
+                      }}
+                    >
+                      <span className="mono-tag" style={{ color: 'var(--accent-cyan)', fontSize: '10px' }}>
+                        OFFICIAL EVALUATION
+                      </span>
+                      {r.marks !== undefined && (
+                        <span
+                          style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontWeight: 700,
+                            color: '#ffffff',
+                            fontSize: '13px',
+                          }}
+                        >
+                          Score: <span style={{ color: 'var(--accent-cyan)' }}>{r.marks}</span> / 100
+                        </span>
+                      )}
+                    </div>
+                    {r.feedback && (
+                      <p
+                        style={{
+                          fontSize: '12px',
+                          color: 'var(--text-secondary)',
+                          fontStyle: 'italic',
+                          margin: '0.25rem 0',
+                        }}
+                      >
+                        &ldquo;{r.feedback}&rdquo;
+                      </p>
+                    )}
+                    <div
+                      style={{
+                        fontSize: '11px',
+                        color:
+                          r.certificate_eligible !== false ? 'var(--accent-emerald)' : 'var(--accent-red)',
+                        marginTop: '0.4rem',
+                      }}
+                    >
+                      <i
+                        className={`fa-solid ${
+                          r.certificate_eligible !== false ? 'fa-circle-check' : 'fa-circle-xmark'
+                        }`}
+                        style={{ marginRight: '4px' }}
+                      ></i>
+                      {r.certificate_issued
+                        ? 'Certificate Officially Issued'
+                        : r.certificate_eligible !== false
+                        ? 'Certificate Eligible (Granted on Turnstile Verification)'
+                        : 'Certificate Ineligible for this submission'}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div
@@ -203,20 +491,22 @@ export default function MyEventsPage() {
                     <span className="badge badge-verified">
                       <i className="fa-solid fa-check"></i> ATTENDED
                     </span>
-                    <button
-                      className="btn btn-cyan btn-sm"
-                      onClick={() =>
-                        setCertModalData({
-                          isOpen: true,
-                          title: ev.name,
-                          student: ev.registration.name,
-                          role: 'Verified Attendee',
-                          date: ev.date.split(' • ')[0],
-                        })
-                      }
-                    >
-                      <i className="fa-solid fa-award"></i> CERTIFICATE AVAILABLE
-                    </button>
+                    {r.certificate_eligible !== false && (
+                      <button
+                        className="btn btn-cyan btn-sm"
+                        onClick={() =>
+                          setCertModalData({
+                            isOpen: true,
+                            title: ev.name,
+                            student: ev.registration.name,
+                            role: r.result ? `${r.result} &bull; Verified Attendee` : 'Verified Attendee',
+                            date: ev.date.split(' • ')[0],
+                          })
+                        }
+                      >
+                        <i className="fa-solid fa-award"></i> CERTIFICATE AVAILABLE
+                      </button>
+                    )}
                     {ev.registration.access_token && (
                       <Link
                         href={`/registration-status/${ev.registration.access_token}`}
@@ -244,7 +534,11 @@ export default function MyEventsPage() {
                 ) : (
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <Link
-                      href={ev.registration.access_token ? `/registration-status/${ev.registration.access_token}` : '/my-passes'}
+                      href={
+                        ev.registration.access_token
+                          ? `/registration-status/${ev.registration.access_token}`
+                          : '/my-passes'
+                      }
                       className="btn btn-primary btn-sm"
                     >
                       <i className="fa-solid fa-ticket"></i> VIEW DIGITAL PASS

@@ -87,7 +87,7 @@ async function runPhase3Tests() {
     event_id: event.id,
     name: 'Seraphina Vance',
     student_id: `STU-2024-${Math.floor(1000 + Math.random() * 9000)}`,
-    college: 'Apex Institute of Technology',
+    college: 'SHEAT College of Engineering',
     course: 'B.Tech Artificial Intelligence',
     semester: 'Year 3 // Sem 5',
     email: `seraphina.${Date.now()}@campus.edu`,

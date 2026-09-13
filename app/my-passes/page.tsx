@@ -4,23 +4,39 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import DigitalPass from '@/components/DigitalPass';
 import { getRegistrations } from '@/lib/db';
-import { RegistrationItem } from '@/types/database';
+import { getStudentSession, setStudentSession } from '@/lib/auth';
+import { RegistrationItem, StudentAccount } from '@/types/database';
 
 export default function MyPassesPage() {
   const [registrations, setRegistrations] = useState<RegistrationItem[]>([]);
   const [activeRegId, setActiveRegId] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [currentStudent, setCurrentStudent] = useState<StudentAccount | null>(null);
+
+  const loadPasses = async () => {
+    setLoading(true);
+    const student = getStudentSession();
+    setCurrentStudent(student);
+
+    const regs = await getRegistrations('ALL', undefined, student?.student_id);
+    const studentRegs = student
+      ? regs.filter(
+          (r) =>
+            r.student_id === student.student_id ||
+            (student.email && r.email?.toLowerCase() === student.email.toLowerCase())
+        )
+      : regs;
+
+    setRegistrations(studentRegs);
+    if (studentRegs.length > 0) {
+      const verified = studentRegs.find((r) => r.status === 'VERIFIED');
+      setActiveRegId(verified ? verified.id : studentRegs[0].id);
+    }
+    setLoading(false);
+  };
 
   useEffect(() => {
-    getRegistrations('ALL').then((regs) => {
-      setRegistrations(regs);
-      if (regs.length > 0) {
-        // Default to first verified registration, or first registration
-        const verified = regs.find((r) => r.status === 'VERIFIED');
-        setActiveRegId(verified ? verified.id : regs[0].id);
-      }
-      setLoading(false);
-    });
+    loadPasses();
   }, []);
 
   const activeReg = registrations.find((r) => r.id === activeRegId);
@@ -32,9 +48,24 @@ export default function MyPassesPage() {
           OFFICIAL ENTRY CREDENTIAL
         </div>
         <h1 style={{ fontSize: '38px' }}>Digital Event Pass</h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: '14px', maxWidth: '600px', margin: '0 auto' }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: '14px', maxWidth: '600px', margin: '0 auto 1rem' }}>
           Present this official digital barcode at campus entrance turnstiles or coordinator scanner stations for instant verification.
         </p>
+
+        {currentStudent ? (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(0, 240, 255, 0.05)', border: '1px solid rgba(0, 240, 255, 0.2)', padding: '4px 14px', borderRadius: 'var(--radius-pill)', fontSize: '12px' }}>
+            <i className="fa-solid fa-user-check" style={{ color: 'var(--accent-cyan)' }}></i>
+            <span>{currentStudent.name}</span>
+            <span className="mono-tag" style={{ color: 'var(--accent-cyan)', fontSize: '10px' }}>{currentStudent.student_id}</span>
+          </div>
+        ) : (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', background: 'rgba(245, 158, 11, 0.05)', border: '1px solid rgba(245, 158, 11, 0.2)', padding: '4px 14px', borderRadius: 'var(--radius-pill)', fontSize: '12px' }}>
+            <span style={{ color: 'var(--accent-amber)' }}>Guest Mode</span>
+            <Link href="/student/login" style={{ color: 'var(--accent-cyan)', textDecoration: 'underline', fontSize: '12px' }}>
+              Sign in to view passes
+            </Link>
+          </div>
+        )}
 
         {/* Pass Selector from Real Registrations */}
         {registrations.length > 1 && (

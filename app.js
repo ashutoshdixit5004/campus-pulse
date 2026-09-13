@@ -71,12 +71,12 @@ const DEFAULT_REGISTRATIONS = [
   {
     id: 'reg-001',
     eventId: 'technova-2026',
-    name: 'Alex Chen',
-    studentId: 'STU-2024-8841',
-    college: 'Apex Institute of Technology',
+    name: 'Ashutosh Dixit',
+    studentId: '2503840100024',
+    college: 'SHEAT College of Engineering',
     course: 'B.Tech Computer Science',
     semester: 'Year 3 // Sem 5',
-    email: 'alex.chen@campus.edu',
+    email: 'dixitashutosh5004@gmail.com',
     phone: '+1 (555) 019-2834',
     date: 'Oct 18, 2026, 14:22',
     status: 'VERIFIED',
@@ -90,7 +90,7 @@ const DEFAULT_REGISTRATIONS = [
     eventId: 'technova-2026',
     name: 'Maya Lin',
     studentId: 'STU-2024-3102',
-    college: 'Apex Institute of Technology',
+    college: 'SHEAT College of Engineering',
     course: 'B.Tech AI & Data Science',
     semester: 'Year 2 // Sem 3',
     email: 'maya.lin@campus.edu',
@@ -107,7 +107,7 @@ const DEFAULT_REGISTRATIONS = [
     eventId: 'technova-2026',
     name: 'Ryan Patel',
     studentId: 'STU-2023-9921',
-    college: 'Apex Institute of Technology',
+    college: 'SHEAT College of Engineering',
     course: 'B.Tech Electronics & Comm',
     semester: 'Year 3 // Sem 5',
     email: 'ryan.p@campus.edu',
@@ -124,7 +124,7 @@ const DEFAULT_REGISTRATIONS = [
     eventId: 'technova-2026',
     name: 'Sarah Jenkins',
     studentId: 'STU-2024-1184',
-    college: 'Apex Institute of Technology',
+    college: 'SHEAT College of Engineering',
     course: 'B.Tech Software Engineering',
     semester: 'Year 1 // Sem 1',
     email: 'sarah.j@campus.edu',
@@ -141,7 +141,7 @@ const DEFAULT_REGISTRATIONS = [
     eventId: 'technova-2026',
     name: 'Marcus Vance',
     studentId: 'STU-2024-4491',
-    college: 'Apex Institute of Technology',
+    college: 'SHEAT College of Engineering',
     course: 'B.Tech Mechanical (Mechatronics)',
     semester: 'Year 2 // Sem 3',
     email: 'marcus.v@campus.edu',
@@ -158,7 +158,7 @@ const DEFAULT_REGISTRATIONS = [
     eventId: 'technova-2026',
     name: 'Elena Rostova',
     studentId: 'STU-2023-7729',
-    college: 'Apex Institute of Technology',
+    college: 'SHEAT College of Engineering',
     course: 'B.Tech Computer Science',
     semester: 'Year 4 // Sem 7',
     email: 'elena.r@campus.edu',
@@ -175,7 +175,7 @@ const DEFAULT_REGISTRATIONS = [
     eventId: 'technova-2026',
     name: 'David Kim',
     studentId: 'STU-2024-5510',
-    college: 'Apex Institute of Technology',
+    college: 'SHEAT College of Engineering',
     course: 'B.Tech Electrical & Electronics',
     semester: 'Year 2 // Sem 3',
     email: 'david.kim@campus.edu',
@@ -192,7 +192,7 @@ const DEFAULT_REGISTRATIONS = [
     eventId: 'technova-2026',
     name: 'Chloe Bennett',
     studentId: 'STU-2024-6632',
-    college: 'Apex Institute of Technology',
+    college: 'SHEAT College of Engineering',
     course: 'B.Tech Information Science',
     semester: 'Year 3 // Sem 5',
     email: 'chloe.b@campus.edu',
@@ -602,7 +602,7 @@ function openVerificationDrawer(regId, showRejectField = false) {
 
   document.getElementById('drawerStudentName').textContent = reg.name;
   document.getElementById('drawerStudentId').textContent = reg.studentId;
-  document.getElementById('drawerCollege').textContent = reg.college || 'Apex Institute of Technology';
+  document.getElementById('drawerCollege').textContent = reg.college || 'SHEAT College of Engineering';
   document.getElementById('drawerCourse').textContent = `${reg.course} • ${reg.semester}`;
   document.getElementById('drawerEmail').textContent = `${reg.email} • ${reg.phone || '+1 555-0192'}`;
   document.getElementById('drawerRegDate').textContent = reg.date;
@@ -686,8 +686,8 @@ function simulateScan(type) {
           </span>
           <span class="mono-tag" style="color: var(--accent-emerald); font-weight: 700;">CHECKED IN</span>
         </div>
-        <div style="font-size: 20px; font-weight: 800; font-family: var(--font-display);">Alex Chen</div>
-        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">Student ID: STU-2024-8841 &bull; B.Tech CSE</div>
+        <div style="font-size: 20px; font-weight: 800; font-family: var(--font-display);">Ashutosh Dixit</div>
+        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">Student ID: 2503840100024 &bull; B.Tech CSE</div>
         <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid rgba(16, 185, 129, 0.2); display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px;">
           <span>PASS ID: <strong style="color: var(--accent-cyan);">PASS-TN-0492</strong></span>
           <span>TIME: <strong>${timestamp}</strong></span>
@@ -697,8 +697,8 @@ function simulateScan(type) {
     `;
 
     // Log check-in
-    addRecentCheckin('Alex Chen', 'PASS-TN-0492', 'STU-2024-8841', gate.split(' - ')[0], timestamp);
-    showToast('✓ Turnstile Unlocked: Alex Chen checked in.');
+    addRecentCheckin('Ashutosh Dixit', 'PASS-TN-0492', '2503840100024', gate.split(' - ')[0], timestamp);
+    showToast('✓ Turnstile Unlocked: Ashutosh Dixit checked in.');
   } 
   else if (type === 'duplicate') {
     resultContainer.innerHTML = `
@@ -709,7 +709,7 @@ function simulateScan(type) {
           </span>
           <span class="mono-tag" style="color: #fbbf24;">DUPLICATE REJECTED</span>
         </div>
-        <div style="font-size: 18px; font-weight: 700;">Pass ID: PASS-TN-0492 (Alex Chen)</div>
+        <div style="font-size: 18px; font-weight: 700;">Pass ID: PASS-TN-0492 (Ashutosh Dixit)</div>
         <div style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">
           Pass already scanned at <strong>09:14 AM</strong> by Gate 02. Turnstile barrier remains locked.
         </div>
@@ -1016,7 +1016,7 @@ function renderMyEventsGrid(tab = 'ALL') {
       actionArea = `
         <div style="display: flex; gap: 6px; align-items: center;">
           <span class="badge badge-verified"><i class="fa-solid fa-check"></i> ATTENDED</span>
-          <button class="btn btn-cyan btn-sm" onclick="previewCertificateModal('${ev.name}', 'Alex Chen', 'Verified Attendee', '${ev.date.split(' • ')[0]}')">
+          <button class="btn btn-cyan btn-sm" onclick="previewCertificateModal('${ev.name}', 'Ashutosh Dixit', 'Verified Attendee', '${ev.date.split(' • ')[0]}')">
             <i class="fa-solid fa-award"></i> CERTIFICATE AVAILABLE
           </button>
         </div>

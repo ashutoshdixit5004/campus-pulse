@@ -6,10 +6,12 @@ export async function GET(request: Request) {
   const filter = (searchParams.get('filter') as any) || 'ALL';
   const eventId = searchParams.get('eventId') || undefined;
   const search = searchParams.get('search') || undefined;
+  const studentId = searchParams.get('studentId') || searchParams.get('student_id') || undefined;
 
-  const registrations = await getRegistrations(filter, eventId, search);
+  const registrations = await getRegistrations(filter, eventId, search, studentId);
   return NextResponse.json(registrations);
 }
+
 
 export async function POST(request: Request) {
   try {

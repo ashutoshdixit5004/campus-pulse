@@ -1,0 +1,74 @@
+{
+  "events": [
+    {
+      "slug": "engineer-s-day",
+      "name": "Engineer’s Day",
+      "description": "Celebrate the legacy of Sir M. Visvesvaraya this Engineer's Day! Bring your boldest tech ideas, code your way through challenges, and design the future. Join us for a day of thrilling competitions, innovation, and networking. Let’s engineer a better tomorrow!",
+      "category": "Cultural",
+      "status": "OPEN",
+      "event_status": "UPCOMING",
+      "date": "2026-10-24",
+      "start_time": "09:00",
+      "end_time": "21:00",
+      "venue": "Seminal Hall",
+      "capacity": 150,
+      "registration_deadline": "2026-10-22T18:29:00.000Z",
+      "organizer_name": "Dean sir ",
+      "organizer_contact": "acm@campus.edu • +1 555-0192",
+      "eligibility": "Open to all ",
+      "rules": "Teams of 1-4. Bring physical college ID card. Turnstile check-in mandatory for certificate.",
+      "id": "ev_mtzjyyj8",
+      "created_at": "2026-09-13T08:29:17.780Z",
+      "registered_count": 1,
+      "verified_count": 1,
+      "checkins_count": 0
+    }
+  ],
+  "registrations": [
+    {
+      "id": "reg_1789288238325",
+      "event_id": "ev_mtzjyyj8",
+      "event_name": "Engineer’s Day",
+      "registration_number": "REG-2026-EN-2116",
+      "name": "Ashutosh Dixit",
+      "student_id": "2503840100024",
+      "college": "SHEAT College of Engineering",
+      "branch": "B.Tech CSE - Babatpur",
+      "course": "B.Tech CSE",
+      "semester": "Year 2 // Sem 3",
+      "email": "dixitashutosh5004@gmail.com",
+      "phone": "7376185824",
+      "document_url": "student_id_card_scan.pdf",
+      "status": "VERIFIED",
+      "access_token": "tok_u5urufvk12_mtzk0ool",
+      "created_at": "2026-09-13T08:30:38.325Z",
+      "pass_token": "PASS-EN-6147",
+      "pass_id": "pass_1789288286951"
+    }
+  ],
+  "certificates": [],
+  "students": [
+    {
+      "id": "stu_mtzk0gsh",
+      "name": "Ashutosh Dixit",
+      "full_name": "Ashutosh Dixit",
+      "student_id": "2503840100024",
+      "email": "dixitashutosh5004@gmail.com",
+      "course": "B.Tech CSE",
+      "college": "SHEAT College of Engineering",
+      "branch": "B.Tech CSE - Babatpur",
+      "phone": "7376185824",
+      "password": "password123",
+      "created_at": "2026-09-13T08:30:28.097Z"
+    }
+  ],
+  "evaluations": [],
+  "adminProfile": {
+    "name": "Dr. Vipasha",
+    "email": "vipasha@sheat.edu",
+    "title": "Head of Student Affairs & Event Coordinator",
+    "phone": "+91 542 262 4884",
+    "department": "Department of Computer Science & Engineering",
+    "updated_at": "2026-09-13T00:00:00.000Z"
+  }
+}

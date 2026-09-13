@@ -78,7 +78,7 @@ async function runPhase2Tests() {
     event_id: createdEvent.slug,
     name: 'Elena Rostova',
     student_id: `STU-2024-${Math.floor(1000 + Math.random() * 9000)}`,
-    college: 'Apex Institute of Technology',
+    college: 'SHEAT College of Engineering',
     course: 'B.Tech Aerospace Systems',
     semester: 'Year 4 // Sem 7',
     email: `elena.rostova.${timestamp}@campus.edu`,

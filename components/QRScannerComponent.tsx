@@ -137,7 +137,7 @@ export default function QRScannerComponent({
           return;
         }
       } catch (e) {}
-      handleValidate('PASS-TN-0492'); // Fallback: Alex Chen
+      handleValidate('PASS-TN-0492'); // Fallback: Ashutosh Dixit
     } else if (type === 'duplicate') {
       try {
         const { getAttendanceList } = await import('@/lib/db');
@@ -201,7 +201,7 @@ export default function QRScannerComponent({
             Simulate Scan:
           </span>
           <button className="btn btn-secondary btn-sm" onClick={() => simulateScenario('valid')}>
-            <i className="fa-solid fa-qrcode" style={{ color: 'var(--accent-emerald)' }}></i> Valid Pass (Alex Chen)
+            <i className="fa-solid fa-qrcode" style={{ color: 'var(--accent-emerald)' }}></i> Valid Pass (Ashutosh Dixit)
           </button>
           <button className="btn btn-secondary btn-sm" onClick={() => simulateScenario('duplicate')}>
             <i className="fa-solid fa-triangle-exclamation" style={{ color: 'var(--accent-amber)' }}></i> Duplicate Scan
@@ -228,7 +228,7 @@ export default function QRScannerComponent({
               value={manualInput}
               onChange={(e) => setManualInput(e.target.value)}
               className="form-input"
-              placeholder="Enter Pass ID e.g. PASS-TN-0492 or STU-2024-8841..."
+              placeholder="Enter Pass ID e.g. PASS-TN-0492 or 2503840100024..."
               style={{ flex: 1 }}
             />
             <button type="submit" className="btn btn-primary">

@@ -4,7 +4,8 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { getEventBySlug, createRegistration } from '@/lib/db';
-import { EventItem, RegistrationItem } from '@/types/database';
+import { getStudentSession } from '@/lib/auth';
+import { EventItem, RegistrationItem, StudentAccount } from '@/types/database';
 import { useToast } from '@/components/ToastProvider';
 
 export default function PublicRegistrationPage() {
@@ -15,11 +16,13 @@ export default function PublicRegistrationPage() {
 
   const [event, setEvent] = useState<EventItem | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loggedInStudent, setLoggedInStudent] = useState<StudentAccount | null>(null);
 
   // Form State
   const [fullName, setFullName] = useState('');
   const [studentId, setStudentId] = useState('');
-  const [college, setCollege] = useState('Apex Institute of Technology');
+  const [college] = useState('SHEAT College of Engineering');
+  const [branch, setBranch] = useState<'B.Tech CSE - Babatpur' | 'B.Tech CSE - Gahani' | ''>('');
   const [course, setCourse] = useState('');
   const [semester, setSemester] = useState('Year 3 // Sem 5');
   const [email, setEmail] = useState('');
@@ -34,13 +37,52 @@ export default function PublicRegistrationPage() {
   const [copiedLink, setCopiedLink] = useState(false);
 
   useEffect(() => {
-    if (slug) {
-      getEventBySlug(slug).then((ev) => {
-        setEvent(ev);
-        setLoading(false);
-      });
+    // Check if student session is logged in, redirect to student login if unauthenticated
+    const student = getStudentSession();
+    if (!student) {
+      router.replace(`/student/login?redirect=${encodeURIComponent(`/register/${slug}`)}`);
+      return;
     }
-  }, [slug]);
+
+    setLoggedInStudent(student);
+    setFullName(student.name || student.full_name || '');
+    setStudentId(student.student_id || '');
+    setBranch((student.branch as any) || '');
+    setCourse(student.course || '');
+    setSemester(student.semester || 'Year 3 // Sem 5');
+    setEmail(student.email || '');
+    setPhone(student.phone || '');
+
+    if (slug) {
+      setLoading(true);
+      const effectiveSlug = decodeURIComponent(String(slug)).trim();
+      getEventBySlug(effectiveSlug)
+        .then(async (ev) => {
+          setEvent(ev);
+          if (ev && student?.student_id) {
+            try {
+              const res = await fetch(`/api/registrations?eventId=${encodeURIComponent(ev.id)}&studentId=${encodeURIComponent(student.student_id)}`);
+              if (res.ok) {
+                const regs = await res.json();
+                if (Array.isArray(regs) && regs.length > 0) {
+                  const existing = regs.find((r: any) => r.event_id === ev.id || r.event_id === ev.slug);
+                  if (existing) {
+                    setSubmittedReg(existing);
+                  }
+                }
+              }
+            } catch (e) {
+              console.warn('Could not verify existing registration:', e);
+            }
+          }
+          setLoading(false);
+        })
+        .catch((err) => {
+          console.error('Failed to load event:', err);
+          setLoading(false);
+        });
+    }
+  }, [slug, router]);
 
   const parseErrorMessage = (err: any): string => {
     const raw = (err?.message || err?.toString() || '').toUpperCase();
@@ -84,6 +126,11 @@ export default function PublicRegistrationPage() {
       return;
     }
 
+    if (!branch) {
+      setErrorMessage('Please select your campus branch (Babatpur or Gahani).');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -94,7 +141,8 @@ export default function PublicRegistrationPage() {
           event_id: event.id,
           name: fullName.trim(),
           student_id: studentId.trim(),
-          college: college.trim(),
+          college: 'SHEAT College of Engineering',
+          branch: branch.trim(),
           course: course.trim(),
           semester: semester.trim(),
           email: email.trim(),
@@ -297,8 +345,57 @@ export default function PublicRegistrationPage() {
             <div id="publicRegisterFormCard" className="glass-panel" style={{ padding: '2rem' }}>
               <h2 style={{ fontSize: '22px', marginBottom: '0.25rem' }}>Student Registration Form</h2>
               <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '1.5rem' }}>
-                No password or account needed. Complete form to submit your registration for coordinator verification.
+                Complete form to submit your registration for coordinator verification.
               </p>
+
+              {loggedInStudent ? (
+                <div
+                  style={{
+                    padding: '0.75rem 1rem',
+                    background: 'rgba(0, 240, 255, 0.05)',
+                    border: '1px solid rgba(0, 240, 255, 0.25)',
+                    borderRadius: 'var(--radius-sm)',
+                    marginBottom: '1.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '0.5rem',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+                    <i className="fa-solid fa-circle-check" style={{ color: 'var(--accent-cyan)' }}></i>
+                    <span>
+                      Logged in as <strong>{loggedInStudent.name}</strong> ({loggedInStudent.student_id})
+                    </span>
+                  </div>
+                  <span className="mono-tag" style={{ color: 'var(--accent-cyan)', fontSize: '10px' }}>
+                    AUTO-FILLED
+                  </span>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    padding: '0.75rem 1rem',
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    borderRadius: 'var(--radius-sm)',
+                    marginBottom: '1.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '0.5rem',
+                    fontSize: '12px',
+                    color: 'var(--text-secondary)',
+                  }}
+                >
+                  <span>Already have an account?</span>
+                  <Link href="/student/login" style={{ color: 'var(--accent-cyan)', textDecoration: 'underline' }}>
+                    Sign In to auto-fill
+                  </Link>
+                </div>
+              )}
 
               {/* Registration Blocked Notice */}
               {isRegistrationBlocked && (
@@ -362,7 +459,7 @@ export default function PublicRegistrationPage() {
                     <input
                       type="text"
                       className="form-input"
-                      placeholder="e.g. Alex Chen"
+                      placeholder="e.g. Ashutosh Dixit"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       required
@@ -375,7 +472,7 @@ export default function PublicRegistrationPage() {
                     <input
                       type="text"
                       className="form-input"
-                      placeholder="e.g. STU-2024-8841"
+                      placeholder="e.g. 2503840100024"
                       value={studentId}
                       onChange={(e) => setStudentId(e.target.value)}
                       required
@@ -384,15 +481,36 @@ export default function PublicRegistrationPage() {
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">College / University *</label>
+                    <label className="form-label">College / Institution (Locked)</label>
                     <input
                       type="text"
                       className="form-input"
-                      value={college}
-                      onChange={(e) => setCollege(e.target.value)}
+                      value="SHEAT College of Engineering"
+                      readOnly
+                      disabled
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.04)',
+                        color: 'var(--text-secondary)',
+                        cursor: 'not-allowed',
+                        borderColor: 'rgba(255, 255, 255, 0.1)',
+                      }}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Campus Branch *</label>
+                    <select
+                      className="form-select"
+                      value={branch}
+                      onChange={(e) => setBranch(e.target.value as any)}
                       required
                       disabled={isRegistrationBlocked || isSubmitting}
-                    />
+                      style={{ borderColor: !branch ? 'var(--accent-orange)' : undefined }}
+                    >
+                      <option value="">Select Campus Branch...</option>
+                      <option value="B.Tech CSE - Babatpur">Babatpur</option>
+                      <option value="B.Tech CSE - Gahani">Gahani</option>
+                    </select>
                   </div>
 
                   <div className="form-group">
@@ -429,7 +547,7 @@ export default function PublicRegistrationPage() {
                     <input
                       type="email"
                       className="form-input"
-                      placeholder="alex.chen@campus.edu"
+                      placeholder="dixitashutosh5004@gmail.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -533,7 +651,7 @@ export default function PublicRegistrationPage() {
                 Registration Number: {submittedReg.registration_number}
               </div>
 
-              {/* Callout box explaining zero login */}
+              {/* Callout box explaining private pass status */}
               <div
                 style={{
                   padding: '1rem 1.25rem',
@@ -550,7 +668,7 @@ export default function PublicRegistrationPage() {
                 }}
               >
                 <i className="fa-solid fa-shield-halved" style={{ color: 'var(--accent-cyan)' }}></i>
-                <span><strong>No login required.</strong> Keep this link safe to access your turnstile pass.</span>
+                <span>Keep this private status link safe to track your verification and digital pass status.</span>
               </div>
 
               {/* Private Access Link Display */}

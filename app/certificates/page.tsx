@@ -5,11 +5,15 @@ import Link from 'next/link';
 import CertificateModal from '@/components/CertificateModal';
 import { useToast } from '@/components/ToastProvider';
 import { getCertificates } from '@/lib/db';
-import { CertificateItem } from '@/types/database';
+import { getStudentSession, setStudentSession } from '@/lib/auth';
+import { CertificateItem, StudentAccount } from '@/types/database';
 
 export default function CertificatesVaultPage() {
   const { showToast } = useToast();
+  const [allCertificates, setAllCertificates] = useState<CertificateItem[]>([]);
   const [certificates, setCertificates] = useState<CertificateItem[]>([]);
+  const [currentStudent, setCurrentStudent] = useState<StudentAccount | null>(null);
+  const [showAllScope, setShowAllScope] = useState(false);
   const [loading, setLoading] = useState(true);
   const [certModalData, setCertModalData] = useState<{
     isOpen: boolean;
@@ -27,12 +31,31 @@ export default function CertificatesVaultPage() {
     authCode: '',
   });
 
-  useEffect(() => {
-    getCertificates().then((certs) => {
+  const loadCerts = async () => {
+    setLoading(true);
+    const student = getStudentSession();
+    setCurrentStudent(student);
+
+    const certs = await getCertificates();
+    setAllCertificates(certs);
+
+    if (student && !showAllScope) {
+      const studentName = (student.name || student.full_name || '').toLowerCase();
+      const filtered = certs.filter(
+        (c) =>
+          c.student_id === student.student_id ||
+          (Boolean(studentName) && Boolean(c.student_name) && c.student_name!.toLowerCase().includes(studentName))
+      );
+      setCertificates(filtered);
+    } else {
       setCertificates(certs);
-      setLoading(false);
-    });
-  }, []);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadCerts();
+  }, [showAllScope]);
 
   const handleDownloadDirect = (title: string) => {
     showToast(`✓ Downloading verified credential for: ${title}`);
@@ -46,8 +69,65 @@ export default function CertificatesVaultPage() {
         </div>
         <h1 style={{ fontSize: '36px' }}>Student Certificates Vault</h1>
         <p style={{ color: 'var(--text-muted)' }}>
-          Accredited merit certificates issued for confirmed turnstile attendance.
+          Accredited merit certificates issued for confirmed turnstile attendance and declared competition awards.
         </p>
+      </div>
+
+      {/* Student Session & Scope Controls */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '1.5rem',
+          flexWrap: 'wrap',
+          gap: '1rem',
+        }}
+      >
+        {currentStudent ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="mono-tag" style={{ color: 'var(--accent-cyan)' }}>
+              STUDENT VAULT: {currentStudent.name} ({currentStudent.student_id})
+            </span>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Viewing public vault.</span>
+            <Link
+              href="/student/login"
+              style={{ color: 'var(--accent-cyan)', textDecoration: 'underline', fontSize: '12px' }}
+            >
+              Sign in for personal vault
+            </Link>
+          </div>
+        )}
+
+        {currentStudent && (
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button
+              className={`btn btn-secondary btn-sm ${!showAllScope ? 'active' : ''}`}
+              onClick={() => setShowAllScope(false)}
+              style={{
+                fontSize: '11px',
+                background: !showAllScope ? '#1f232e' : undefined,
+                borderBottom: !showAllScope ? '2px solid var(--accent-orange)' : undefined,
+              }}
+            >
+              My Certificates ({certificates.length})
+            </button>
+            <button
+              className={`btn btn-secondary btn-sm ${showAllScope ? 'active' : ''}`}
+              onClick={() => setShowAllScope(true)}
+              style={{
+                fontSize: '11px',
+                background: showAllScope ? '#1f232e' : undefined,
+                borderBottom: showAllScope ? '2px solid var(--accent-orange)' : undefined,
+              }}
+            >
+              All College Awards ({allCertificates.length})
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="glass-panel" style={{ padding: '2rem' }}>
@@ -89,12 +169,29 @@ export default function CertificatesVaultPage() {
                     <i className="fa-solid fa-award" style={{ color: 'var(--accent-cyan)' }}></i>
                   </div>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: '15px' }}>{cert.event_name || 'Campus Event'}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontWeight: 700, fontSize: '15px' }}>{cert.event_name || 'Campus Event'}</span>
+                      {cert.result === 'WINNER' && (
+                        <span style={{ background: 'rgba(234, 179, 8, 0.15)', border: '1px solid #eab308', color: '#facc15', padding: '1px 7px', borderRadius: '4px', fontSize: '10px', fontWeight: 700 }}>
+                          🥇 WINNER
+                        </span>
+                      )}
+                      {cert.result === 'RUNNER-UP' && (
+                        <span style={{ background: 'rgba(226, 232, 240, 0.12)', border: '1px solid #cbd5e1', color: '#e2e8f0', padding: '1px 7px', borderRadius: '4px', fontSize: '10px', fontWeight: 700 }}>
+                          🥈 RUNNER-UP
+                        </span>
+                      )}
+                      {cert.result === 'SECOND RUNNER-UP' && (
+                        <span style={{ background: 'rgba(217, 119, 6, 0.15)', border: '1px solid #b45309', color: '#f59e0b', padding: '1px 7px', borderRadius: '4px', fontSize: '10px', fontWeight: 700 }}>
+                          🥉 2ND RUNNER-UP
+                        </span>
+                      )}
+                    </div>
                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                       {cert.role || 'Delegate Participant'} &bull; {cert.student_name || 'Student Attendee'} &bull; {cert.event_date || new Date(cert.issued_at).toLocaleDateString()}
                     </div>
                     <div className="mono-tag" style={{ color: 'var(--accent-emerald)', fontSize: '9px', marginTop: '2px' }}>
-                      {cert.certificate_number} &bull; VERIFIED ATTENDEE
+                      {cert.certificate_number} &bull; VERIFIED ATTENDEE {cert.marks !== undefined ? `&bull; SCORE: ${cert.marks}/100` : ''}
                     </div>
                   </div>
                 </div>

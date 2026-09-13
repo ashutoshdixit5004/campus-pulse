@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { RegistrationItem } from '@/types/database';
+import { RegistrationItem, formatBranch } from '@/types/database';
 import StatusBadge from './StatusBadge';
 
 interface VerificationDrawerProps {
@@ -103,6 +103,12 @@ export default function VerificationDrawer({
               <div className="form-label">COLLEGE</div>
               <div style={{ fontWeight: 600 }}>{registration.college}</div>
             </div>
+            {registration.branch && (
+              <div>
+                <div className="form-label">CAMPUS BRANCH</div>
+                <div style={{ fontWeight: 600, color: 'var(--accent-cyan)' }}>{formatBranch(registration.branch)}</div>
+              </div>
+            )}
             <div>
               <div className="form-label">COURSE & SEMESTER</div>
               <div style={{ fontWeight: 600 }}>
