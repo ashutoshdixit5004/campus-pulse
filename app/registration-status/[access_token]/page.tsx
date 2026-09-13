@@ -170,9 +170,9 @@ export default function RegistrationStatusPage() {
       <div id="digitalPassCard">
         <DigitalPass
           registration={registration}
-          eventName={event?.name || registration.event_name || 'Technova 2026 // 48-Hr Hackathon'}
-          eventDate={event ? `${event.date} • ${event.start_time}` : 'Oct 24, 2026 • 09:00 AM'}
-          eventVenue={event ? `${event.venue} • Gate 02` : 'Main Tech Auditorium // Complex B • Gate 02'}
+          eventName={event?.name || registration.event_name || 'Campus Event'}
+          eventDate={event ? `${event.date} • ${event.start_time}` : 'Official Event Session'}
+          eventVenue={event ? `${event.venue}` : 'Campus Venue'}
         />
       </div>
 

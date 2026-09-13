@@ -1,8 +1,18 @@
 import { NextResponse } from 'next/server';
-import { getRegistrations, createRegistration } from '@/lib/db';
+import { getRegistrations, createRegistration, getRegistrationByAccessToken } from '@/lib/db';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
+  const token = searchParams.get('token') || searchParams.get('accessToken') || searchParams.get('access_token') || searchParams.get('passToken');
+
+  if (token) {
+    const reg = await getRegistrationByAccessToken(token);
+    if (!reg) {
+      return NextResponse.json({ error: 'REGISTRATION_NOT_FOUND: Invalid or expired access token.' }, { status: 404 });
+    }
+    return NextResponse.json(reg);
+  }
+
   const filter = (searchParams.get('filter') as any) || 'ALL';
   const eventId = searchParams.get('eventId') || undefined;
   const search = searchParams.get('search') || undefined;

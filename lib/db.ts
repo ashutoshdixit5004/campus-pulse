@@ -37,6 +37,42 @@ export const DEFAULT_ADMIN_PROFILE: AdminProfile = {
   updated_at: new Date().toISOString(),
 };
 
+// ============================================================================
+// PRODUCTION DEMO FILTER & PURGE HELPERS
+// ============================================================================
+const DEMO_EVENT_SLUGS = new Set(['technova-2026', 'aurora-2026', 'robowars-2026', 'esummit-2026']);
+const DEMO_EVENT_IDS = new Set(['ev_technova', 'ev_aurora', 'ev_robowars', 'ev_esummit']);
+const DEMO_REG_IDS = new Set(['reg_001', 'reg_002', 'reg_003', 'reg_004', 'reg_005', 'reg_006', 'reg_007', 'reg_008']);
+
+export function isDemoRecord(item: any): boolean {
+  if (!item) return false;
+  if (item.slug && DEMO_EVENT_SLUGS.has(item.slug)) return true;
+  if (item.id && (DEMO_EVENT_IDS.has(item.id) || DEMO_REG_IDS.has(item.id))) return true;
+  if (typeof item.access_token === 'string' && (item.access_token.includes('demo') || item.access_token.includes('alex_chen') || item.access_token.includes('maya_lin'))) return true;
+  if (typeof item.pass_token === 'string' && (item.pass_token.includes('PASS-TN-') || item.pass_token.includes('DEMO'))) return true;
+  if (item.event_id && (DEMO_EVENT_IDS.has(item.event_id) || DEMO_EVENT_SLUGS.has(item.event_id))) return true;
+  if (item.student_id === 'STU-2024-3102' || item.student_id === 'STU-2023-9921' || item.student_id === 'STU-2024-1184') return true;
+  return false;
+}
+
+let hasPurgedSupabase = false;
+export async function purgeSupabaseDemoData(): Promise<void> {
+  if (hasPurgedSupabase) return;
+  const client = getClient(true);
+  if (!client) return;
+  hasPurgedSupabase = true;
+  try {
+    await client.from('attendance').delete().in('id', ['att_001', 'att_002', 'att_003', 'att_004']);
+    await client.from('passes').delete().in('id', ['pass_001', 'pass_002', 'pass_003', 'pass_004', 'pass_007']);
+    await client.from('evaluations').delete().eq('id', 'eval_001');
+    await client.from('certificates').delete().eq('id', 'cert_001');
+    await client.from('registrations').delete().in('id', ['reg_001', 'reg_002', 'reg_003', 'reg_004', 'reg_005', 'reg_006', 'reg_007', 'reg_008']);
+    await client.from('events').delete().in('slug', ['technova-2026', 'aurora-2026', 'robowars-2026', 'esummit-2026']);
+  } catch (err) {
+    // Non-fatal if Supabase already cleaned or disconnected
+  }
+}
+
 // Safe isomorphic server filesystem helpers
 function getFs(): any {
   if (typeof window === 'undefined') {
@@ -268,6 +304,7 @@ export async function updateAdminProfile(updates: Partial<AdminProfile>): Promis
 export async function getEvents(includeArchived: boolean = false): Promise<EventItem[]> {
   const client = getClient();
   if (client) {
+    purgeSupabaseDemoData().catch(() => {});
     try {
       const { data: events, error } = await client
         .from('events')
@@ -276,14 +313,15 @@ export async function getEvents(includeArchived: boolean = false): Promise<Event
 
       if (error) throw error;
 
-      if (events && events.length > 0) {
+      if (Array.isArray(events)) {
         // Compute real counts from registrations and attendance
         const { data: regData } = await client.from('registrations').select('event_id, status');
         const { data: attData } = await client.from('attendance').select('event_id');
 
-        const mapped = events.map((ev: any) => {
-          const evRegs = (regData || []).filter((r: any) => r.event_id === ev.id);
-          const evAtts = (attData || []).filter((a: any) => a.event_id === ev.id);
+        const cleanEvents = events.filter((ev: any) => !isDemoRecord(ev));
+        const mapped = cleanEvents.map((ev: any) => {
+          const evRegs = (regData || []).filter((r: any) => r.event_id === ev.id && !isDemoRecord(r));
+          const evAtts = (attData || []).filter((a: any) => a.event_id === ev.id && !isDemoRecord(a));
           return {
             ...ev,
             registered_count: evRegs.length,
@@ -306,9 +344,10 @@ export async function getEvents(includeArchived: boolean = false): Promise<Event
       if (res.ok) {
         const events = await res.json();
         if (Array.isArray(events)) {
-          memoryEvents = events;
+          const cleanEvents = events.filter((e: any) => !isDemoRecord(e));
+          memoryEvents = cleanEvents;
           saveClientStorage();
-          return includeArchived ? events : events.filter((e: any) => !e.is_archived);
+          return includeArchived ? cleanEvents : cleanEvents.filter((e: any) => !e.is_archived);
         }
       }
     } catch (e) {
@@ -317,7 +356,7 @@ export async function getEvents(includeArchived: boolean = false): Promise<Event
   }
 
   syncClientStorage();
-  const list = memoryEvents.filter(e => includeArchived || !e.is_archived);
+  const list = memoryEvents.filter(e => !isDemoRecord(e) && (includeArchived || !e.is_archived));
   return list;
 }
 
@@ -626,7 +665,8 @@ export async function getRegistrations(
 
       if (data) {
         syncClientStorage();
-        return data.map((r: any) => {
+        const cleanData = data.filter((r: any) => !isDemoRecord(r));
+        return cleanData.map((r: any) => {
           const pass = Array.isArray(r.passes) ? r.passes[0] : r.passes;
           const att = Array.isArray(r.attendance) ? r.attendance[0] : r.attendance;
           const evalItem = memoryEvaluations.find(e => e.registration_id === r.id);
@@ -665,7 +705,7 @@ export async function getRegistrations(
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
-          return data;
+          return data.filter((r: any) => !isDemoRecord(r));
         }
       }
     } catch (e) {
@@ -674,7 +714,7 @@ export async function getRegistrations(
   }
 
   syncClientStorage();
-  let list = [...memoryRegistrations];
+  let list = memoryRegistrations.filter(r => !isDemoRecord(r));
 
   if (studentId) {
     list = list.filter(r => r.student_id === studentId || r.email.toLowerCase() === studentId.toLowerCase());
@@ -720,6 +760,14 @@ export async function getRegistrations(
 
 
 export async function getRegistrationByAccessToken(token: string): Promise<RegistrationItem | null> {
+  if (!token) return null;
+  const rawToken = String(token).trim();
+  let decodedToken = rawToken;
+  try {
+    decodedToken = decodeURIComponent(rawToken).trim();
+  } catch {}
+  const lowerToken = decodedToken.toLowerCase();
+
   const client = getClient();
 
   if (client) {
@@ -732,17 +780,17 @@ export async function getRegistrationByAccessToken(token: string): Promise<Regis
           passes(id, pass_token, status),
           attendance(id, gate, checked_in_at)
         `)
-        .eq('access_token', token)
+        .or(`access_token.eq.${rawToken},pass_token.eq.${rawToken},id.eq.${rawToken},registration_number.eq.${rawToken},access_token.eq.${decodedToken}`)
         .maybeSingle();
 
       if (error) throw error;
-      if (r) {
+      if (r && !isDemoRecord(r)) {
         const pass = Array.isArray(r.passes) ? r.passes[0] : r.passes;
         const att = Array.isArray(r.attendance) ? r.attendance[0] : r.attendance;
         return {
           ...r,
           event_name: r.events?.name || 'Campus Event',
-          pass_token: pass?.pass_token || null,
+          pass_token: pass?.pass_token || r.pass_token || null,
           pass_id: pass?.id || null,
           checked_in: Boolean(att),
           checkin_time: att ? new Date(att.checked_in_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : null,
@@ -754,8 +802,49 @@ export async function getRegistrationByAccessToken(token: string): Promise<Regis
     }
   }
 
+  // Client runtime: always query server API so incognito or different browsers load real data from server!
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch(`/api/registrations?token=${encodeURIComponent(decodedToken)}`);
+      if (res.ok) {
+        const serverReg = await res.json();
+        if (serverReg && (serverReg.id || serverReg.access_token) && !isDemoRecord(serverReg)) {
+          const idx = memoryRegistrations.findIndex(r => r.id === serverReg.id || r.access_token === serverReg.access_token);
+          if (idx >= 0) memoryRegistrations[idx] = serverReg;
+          else memoryRegistrations.unshift(serverReg);
+          saveClientStorage();
+          return serverReg;
+        }
+      }
+    } catch (err) {
+      console.warn('Client fetch /api/registrations?token error:', err);
+    }
+  }
+
   syncClientStorage();
-  return memoryRegistrations.find(r => r.access_token === token) || null;
+  const cleanList = memoryRegistrations.filter(r => !isDemoRecord(r));
+  const found = cleanList.find(r => 
+    r.access_token === rawToken || 
+    r.access_token === decodedToken ||
+    r.pass_token === rawToken || 
+    r.pass_token === decodedToken ||
+    r.id === rawToken || 
+    r.id === decodedToken ||
+    r.registration_number === rawToken ||
+    r.registration_number === decodedToken ||
+    (r.access_token && r.access_token.toLowerCase() === lowerToken) ||
+    (r.pass_token && r.pass_token.toLowerCase() === lowerToken) ||
+    (r.registration_number && r.registration_number.toLowerCase() === lowerToken)
+  );
+
+  if (found) {
+    if (!found.events) {
+      const ev = memoryEvents.find(e => e.id === found.event_id || e.slug === found.event_id);
+      return { ...found, events: ev, event_name: ev?.name || found.event_name || 'Campus Event' };
+    }
+    return found;
+  }
+  return null;
 }
 
 export async function createRegistration(data: {
@@ -835,27 +924,51 @@ export async function createRegistration(data: {
       const accessToken = `tok_${Math.random().toString(36).substring(2, 12)}_${Date.now().toString(36)}`;
       const newId = `reg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-      const { data: inserted, error: insertError } = await client
-        .from('registrations')
-        .insert([{
-          id: newId,
-          event_id: event.id,
-          registration_number: regNumber,
-          name: data.name.trim(),
-          student_id: data.student_id.trim(),
-          college: fixedCollege,
-          branch: selectedBranch,
-          course: data.course.trim(),
-          semester: data.semester.trim(),
-          email: data.email.trim(),
-          phone: data.phone.trim(),
-          document_url: data.document_url || 'student_id_scan.pdf',
-          status: 'PENDING',
-          access_token: accessToken,
-          team_name: data.team_name?.trim() || null
-        }])
-        .select('*, events:event_id(name, slug)')
-        .single();
+      const payload: any = {
+        id: newId,
+        event_id: event.id,
+        registration_number: regNumber,
+        name: data.name.trim(),
+        student_id: data.student_id.trim(),
+        college: fixedCollege,
+        course: data.course.trim(),
+        semester: data.semester.trim(),
+        email: data.email.trim(),
+        phone: data.phone.trim(),
+        document_url: data.document_url || 'student_id_scan.pdf',
+        status: 'PENDING',
+        access_token: accessToken,
+        team_name: data.team_name?.trim() || null
+      };
+      if (selectedBranch) {
+        payload.branch = selectedBranch;
+      }
+
+      let inserted: any = null;
+      let insertError: any = null;
+
+      try {
+        const res = await client.from('registrations').insert([payload]).select().single();
+        inserted = res.data;
+        insertError = res.error;
+      } catch (e: any) {
+        insertError = e;
+      }
+
+      // If Supabase table does not have 'branch' column yet, retry cleanly without it
+      if (insertError && (insertError.message?.includes('branch') || String(insertError).includes('branch'))) {
+        delete payload.branch;
+        if (selectedBranch) {
+          payload.college = `${fixedCollege} - ${selectedBranch}`;
+        }
+        try {
+          const retryRes = await client.from('registrations').insert([payload]).select().single();
+          inserted = retryRes.data;
+          insertError = retryRes.error;
+        } catch (e: any) {
+          insertError = e;
+        }
+      }
 
       if (insertError || !inserted) {
         throw new Error(`REGISTRATION_FAILED: ${insertError?.message || 'Database insert failed'}`);
@@ -864,6 +977,7 @@ export async function createRegistration(data: {
       return {
         ...inserted,
         event_name: event.name,
+        branch: selectedBranch || inserted.branch || null,
         pass_token: null,
         pass_id: null,
         checked_in: false,
@@ -1431,7 +1545,7 @@ export async function getAttendanceList(
           list = list.filter((r: any) => !r.checked_in);
         }
 
-        return list;
+        return list.filter((r: any) => !isDemoRecord(r));
       }
     } catch (err) {
       console.error('Supabase getAttendanceList error:', err);
@@ -1439,7 +1553,7 @@ export async function getAttendanceList(
   }
 
   syncClientStorage();
-  let list = memoryRegistrations.filter(r => r.status === 'VERIFIED');
+  let list = memoryRegistrations.filter(r => !isDemoRecord(r) && r.status === 'VERIFIED');
 
   if (eventId && eventId.trim()) {
     list = list.filter(r => r.event_id === eventId.trim());
@@ -1481,14 +1595,16 @@ export async function getRecentCheckins(limit: number = 8): Promise<Registration
 
       if (error) throw error;
       if (data) {
-        return data.map((a: any) => ({
-          ...a.registrations,
-          event_name: a.events?.name,
-          pass_token: a.passes?.pass_token,
-          gate: a.gate,
-          checkin_time: new Date(a.checked_in_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-          checked_in: true
-        }));
+        return data
+          .filter((a: any) => !isDemoRecord(a.registrations) && !isDemoRecord(a.events))
+          .map((a: any) => ({
+            ...a.registrations,
+            event_name: a.events?.name,
+            pass_token: a.passes?.pass_token,
+            gate: a.gate,
+            checkin_time: new Date(a.checked_in_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+            checked_in: true
+          }));
       }
     } catch (err) {
       console.error('Supabase getRecentCheckins error:', err);
@@ -1496,7 +1612,7 @@ export async function getRecentCheckins(limit: number = 8): Promise<Registration
   }
 
   syncClientStorage();
-  return memoryRegistrations.filter(r => r.checked_in).slice(0, limit);
+  return memoryRegistrations.filter(r => !isDemoRecord(r) && r.checked_in).slice(0, limit);
 }
 
 // ============================================================================
@@ -1519,18 +1635,20 @@ export async function getCertificates(): Promise<CertificateItem[]> {
 
       if (error) throw error;
       if (data) {
-        return data.map((c: any) => ({
-          id: c.id,
-          event_id: c.event_id,
-          registration_id: c.registration_id,
-          certificate_number: c.certificate_number,
-          certificate_url: c.certificate_url,
-          role: c.role || 'Delegate Participant',
-          event_name: c.events?.name || 'Campus Event',
-          student_name: c.registrations?.name || 'Ashutosh Dixit',
-          event_date: c.events?.date || '2026-10-24',
-          issued_at: c.issued_at
-        }));
+        return data
+          .filter((c: any) => !isDemoRecord(c) && !isDemoRecord(c.events))
+          .map((c: any) => ({
+            id: c.id,
+            event_id: c.event_id,
+            registration_id: c.registration_id,
+            certificate_number: c.certificate_number,
+            certificate_url: c.certificate_url,
+            role: c.role || 'Participant',
+            event_name: c.events?.name || 'Campus Event',
+            student_name: c.registrations?.name || 'Student',
+            event_date: c.events?.date || new Date().toISOString().split('T')[0],
+            issued_at: c.issued_at
+          }));
       }
     } catch (err) {
       console.error('Supabase getCertificates error:', err);
@@ -1538,7 +1656,7 @@ export async function getCertificates(): Promise<CertificateItem[]> {
   }
 
   syncClientStorage();
-  return memoryCertificates;
+  return memoryCertificates.filter(c => !isDemoRecord(c));
 }
 
 export async function issueCertificatesForEvent(eventId: string): Promise<number> {
@@ -1920,14 +2038,16 @@ export async function getEvaluations(eventId: string): Promise<EvaluationItem[]>
         .eq('event_id', eventId);
 
       if (error) throw error;
-      if (data && data.length > 0) return data;
+      if (Array.isArray(data)) {
+        return data.filter((e: any) => !isDemoRecord(e));
+      }
     } catch (err) {
       console.error('Supabase getEvaluations error:', err);
     }
   }
 
   syncClientStorage();
-  return memoryEvaluations.filter(e => e.event_id === eventId);
+  return memoryEvaluations.filter(e => e.event_id === eventId && !isDemoRecord(e));
 }
 
 export async function saveEvaluation(data: {
@@ -2093,5 +2213,215 @@ export function resetDemoState() {
   memoryEvaluations = [];
   memoryAdminProfile = JSON.parse(JSON.stringify(DEFAULT_ADMIN_PROFILE));
   saveClientStorage();
+}
+
+// ============================================================================
+// 10. GET OR CREATE STUDENT PASS FLOW
+// ============================================================================
+
+export async function getOrCreateStudentPass(
+  eventIdOrSlug: string,
+  studentIdOrEmail: string,
+  studentDetails?: Partial<StudentAccount>
+): Promise<{
+  registration: RegistrationItem;
+  access_token: string;
+  pass_token: string;
+}> {
+  if (!eventIdOrSlug || !studentIdOrEmail) {
+    throw new Error('MISSING_PARAMETERS: event_id and student_id are required.');
+  }
+
+  // 1. Resolve event
+  const event = await getEventBySlug(eventIdOrSlug);
+  if (!event) {
+    throw new Error('EVENT_NOT_FOUND: The requested event could not be found.');
+  }
+
+  syncClientStorage();
+  const cleanId = studentIdOrEmail.trim().toLowerCase();
+
+  // 2. Resolve student from memory or provided details
+  const student = memoryStudents.find(
+    s => s.student_id.toLowerCase() === cleanId || s.email.toLowerCase() === cleanId
+  ) || studentDetails;
+
+  const client = getClient(true);
+
+  // 3. Check existing registration
+  let existingReg: any = null;
+
+  if (client) {
+    try {
+      const { data } = await client
+        .from('registrations')
+        .select(`
+          *,
+          passes(id, pass_token, status)
+        `)
+        .eq('event_id', event.id)
+        .or(`student_id.ilike.${cleanId},email.ilike.${cleanId}`)
+        .maybeSingle();
+      if (data && !isDemoRecord(data)) existingReg = data;
+    } catch (e) {
+      console.warn('Supabase existingReg check error:', e);
+    }
+  }
+
+  if (!existingReg) {
+    existingReg = memoryRegistrations.find(
+      r => !isDemoRecord(r) &&
+           (r.event_id === event.id || r.event_id === event.slug) &&
+           (r.student_id.toLowerCase() === cleanId || r.email.toLowerCase() === cleanId)
+    );
+  }
+
+  const prefix = (event.slug || 'EV').slice(0, 3).replace(/[^a-zA-Z0-9]/g, '').toUpperCase() || 'EV';
+  const randNum = Math.floor(1000 + Math.random() * 9000);
+
+  if (existingReg) {
+    // Ensure valid access_token exists
+    let accessToken = existingReg.access_token;
+    if (!accessToken || isDemoRecord(existingReg)) {
+      accessToken = `tok_${Math.random().toString(36).substring(2, 12)}_${Date.now().toString(36)}`;
+      existingReg.access_token = accessToken;
+    }
+
+    // Ensure valid pass_token exists
+    let passToken = existingReg.pass_token;
+    if (Array.isArray(existingReg.passes) && existingReg.passes[0]?.pass_token) {
+      passToken = existingReg.passes[0].pass_token;
+    }
+    if (!passToken || passToken.includes('DEMO')) {
+      passToken = `PASS-${prefix}-${randNum}`;
+      existingReg.pass_token = passToken;
+      existingReg.pass_id = `pass_${Date.now()}`;
+    }
+
+    existingReg.status = 'VERIFIED';
+
+    // Persist updates to Supabase if available
+    if (client) {
+      try {
+        await client.from('registrations').update({
+          access_token: accessToken,
+          status: 'VERIFIED'
+        }).eq('id', existingReg.id);
+
+        const { data: passRow } = await client.from('passes').select('id').eq('registration_id', existingReg.id).maybeSingle();
+        if (!passRow) {
+          await client.from('passes').insert([{
+            id: `pass_${Date.now()}`,
+            registration_id: existingReg.id,
+            pass_token: passToken,
+            status: 'VALID'
+          }]);
+        }
+      } catch (err) {
+        console.warn('Failed to update pass in Supabase:', err);
+      }
+    }
+
+    const idx = memoryRegistrations.findIndex(r => r.id === existingReg.id);
+    if (idx >= 0) memoryRegistrations[idx] = { ...memoryRegistrations[idx], ...existingReg };
+    else memoryRegistrations.unshift(existingReg);
+    saveClientStorage();
+
+    return {
+      registration: { ...existingReg, events: event, event_name: event.name },
+      access_token: accessToken,
+      pass_token: passToken,
+    };
+  }
+
+  // 4. Create new verified registration with valid access and pass token
+  const newRegId = `reg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+  const regNumber = `REG-2026-${prefix}-${randNum}`;
+  const accessToken = `tok_${Math.random().toString(36).substring(2, 12)}_${Date.now().toString(36)}`;
+  const passToken = `PASS-${prefix}-${randNum}`;
+  const studentName = student?.name || (student as any)?.full_name || studentDetails?.name || (studentDetails as any)?.full_name || 'Student';
+  const studentRoll = student?.student_id || studentDetails?.student_id || studentIdOrEmail;
+  const studentEmail = student?.email || studentDetails?.email || `${cleanId}@campus.edu`;
+  const studentPhone = student?.phone || studentDetails?.phone || '9876543210';
+  const studentCollege = student?.college || studentDetails?.college || 'SHEAT College of Engineering';
+  const studentBranch = student?.branch || studentDetails?.branch || 'Babatpur';
+  const studentCourse = student?.course || studentDetails?.course || 'B.Tech CSE';
+  const studentSemester = student?.semester || studentDetails?.semester || 'Semester 4';
+
+  const newReg: RegistrationItem = {
+    id: newRegId,
+    event_id: event.id,
+    event_name: event.name,
+    registration_number: regNumber,
+    name: studentName,
+    student_id: studentRoll,
+    college: studentCollege,
+    branch: studentBranch,
+    course: studentCourse,
+    semester: studentSemester,
+    email: studentEmail,
+    phone: studentPhone,
+    document_url: 'student_id_scan.pdf',
+    status: 'VERIFIED',
+    access_token: accessToken,
+    pass_token: passToken,
+    pass_id: `pass_${Date.now()}`,
+    created_at: new Date().toISOString(),
+    checked_in: false,
+    events: event
+  };
+
+  if (client) {
+    try {
+      const payload: any = {
+        id: newRegId,
+        event_id: event.id,
+        registration_number: regNumber,
+        name: studentName,
+        student_id: studentRoll,
+        college: studentCollege,
+        course: studentCourse,
+        semester: studentSemester,
+        email: studentEmail,
+        phone: studentPhone,
+        document_url: 'student_id_scan.pdf',
+        status: 'VERIFIED',
+        access_token: accessToken,
+      };
+      if (studentBranch) payload.branch = studentBranch;
+
+      let insertedOk = false;
+      try {
+        const { error } = await client.from('registrations').insert([payload]);
+        if (!error) insertedOk = true;
+      } catch {}
+
+      if (!insertedOk) {
+        delete payload.branch;
+        payload.college = `${studentCollege} - ${studentBranch}`;
+        await client.from('registrations').insert([payload]);
+      }
+
+      await client.from('passes').insert([{
+        id: `pass_${Date.now()}`,
+        registration_id: newRegId,
+        pass_token: passToken,
+        status: 'VALID'
+      }]);
+    } catch (e) {
+      console.warn('Supabase insert pass registration error:', e);
+    }
+  }
+
+  event.registered_count = (event.registered_count || 0) + 1;
+  event.verified_count = (event.verified_count || 0) + 1;
+  memoryRegistrations.unshift(newReg);
+  saveClientStorage();
+
+  return {
+    registration: newReg,
+    access_token: accessToken,
+    pass_token: passToken,
+  };
 }
 

@@ -103,10 +103,10 @@ export default function StudentHomePage() {
                 </span>
               </div>
               <h2 style={{ fontSize: '26px', marginBottom: '0.25rem' }}>
-                {activePassReg.event_name || 'Technova 2026 Hackathon'}
+                {activePassReg.event_name || 'Upcoming Campus Event'}
               </h2>
               <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '1.25rem' }}>
-                Oct 24, 2026 &bull; 09:00 AM &bull; Main Tech Auditorium // Complex B
+                {activePassReg.events?.date ? `${activePassReg.events.date} • ${activePassReg.events.start_time || ''} • ${activePassReg.events.venue || ''}` : 'Official Campus Event Registration'}
               </p>
 
               <div
@@ -119,7 +119,7 @@ export default function StudentHomePage() {
                 }}
               >
                 <div className="mono-tag" style={{ color: 'var(--text-muted)' }}>
-                  PASS ID: <span style={{ color: 'var(--accent-cyan)' }}>{activePassReg.pass_token || 'PASS-TN-0492'}</span>
+                  PASS ID: <span style={{ color: 'var(--accent-cyan)' }}>{activePassReg.pass_token || activePassReg.registration_number}</span>
                 </div>
                 <Link href="/my-passes" className="btn btn-primary btn-sm">
                   <i className="fa-solid fa-qrcode"></i> VIEW DIGITAL PASS

@@ -2,18 +2,56 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { getEvents } from '@/lib/db';
+import { getStudentSession } from '@/lib/auth';
 import { EventItem } from '@/types/database';
 import StatusBadge from '@/components/StatusBadge';
+import { useToast } from '@/components/ToastProvider';
 
 export default function DiscoverEventsPage() {
+  const router = useRouter();
+  const { showToast } = useToast();
   const [events, setEvents] = useState<EventItem[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [processingSlug, setProcessingSlug] = useState<string | null>(null);
 
   useEffect(() => {
     getEvents().then((data) => setEvents(data));
   }, []);
+
+  const handleGetPass = async (eventSlug: string) => {
+    const session = getStudentSession();
+    if (!session) {
+      router.push(`/login?redirect=/events/${encodeURIComponent(eventSlug)}?action=get-pass`);
+      return;
+    }
+
+    setProcessingSlug(eventSlug);
+    try {
+      const res = await fetch('/api/events/get-pass', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_id: eventSlug,
+          student_id: session.student_id,
+          student: session,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to retrieve pass');
+      }
+
+      showToast('✓ Verified digital pass ready! Redirecting...');
+      router.push(data.redirect_url || `/registration-status/${data.access_token}`);
+    } catch (err: any) {
+      showToast(err.message || 'Could not retrieve pass', 'error');
+      setProcessingSlug(null);
+    }
+  };
 
   const categories = ['ALL', 'Technical', 'Cultural', 'Robotics', 'Entrepreneurship'];
 
@@ -174,13 +212,23 @@ export default function DiscoverEventsPage() {
                     CLOSED
                   </button>
                 ) : (
-                  <Link
-                    href={`/register/${ev.slug}`}
+                  <button
+                    type="button"
+                    onClick={() => handleGetPass(ev.slug)}
+                    disabled={processingSlug === ev.slug}
                     className="btn btn-primary btn-sm"
                     style={{ flex: 1 }}
                   >
-                    <i className="fa-solid fa-paper-plane"></i> REGISTER
-                  </Link>
+                    {processingSlug === ev.slug ? (
+                      <>
+                        <i className="fa-solid fa-spinner fa-spin"></i> PASS...
+                      </>
+                    ) : (
+                      <>
+                        <i className="fa-solid fa-ticket"></i> GET PASS
+                      </>
+                    )}
+                  </button>
                 )}
               </div>
             </div>

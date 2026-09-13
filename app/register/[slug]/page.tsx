@@ -85,7 +85,8 @@ export default function PublicRegistrationPage() {
   }, [slug, router]);
 
   const parseErrorMessage = (err: any): string => {
-    const raw = (err?.message || err?.toString() || '').toUpperCase();
+    const rawMsg = err?.message || err?.toString() || '';
+    const raw = rawMsg.toUpperCase();
     if (raw.includes('DUPLICATE_REGISTRATION') || raw.includes('ALREADY REGISTERED')) {
       return 'ALREADY REGISTERED: A registration with this Student ID or Email already exists for this event.';
     }
@@ -103,6 +104,9 @@ export default function PublicRegistrationPage() {
     }
     if (raw.includes('EVENT_NOT_FOUND')) {
       return 'EVENT NOT FOUND: The requested event could not be found in the registry.';
+    }
+    if (rawMsg && rawMsg !== 'REGISTRATION_FAILED' && rawMsg.length > 5) {
+      return `REGISTRATION FAILED: ${rawMsg.replace(/^REGISTRATION_FAILED:\s*/, '')}`;
     }
     return 'REGISTRATION FAILED: Unable to submit credentials. Please verify your details and retry.';
   };

@@ -7,8 +7,8 @@ import { EventItem, RegistrationItem } from '@/types/database';
 
 export default function AdminScannerPage() {
   const [events, setEvents] = useState<EventItem[]>([]);
-  const [selectedEventSlug, setSelectedEventSlug] = useState('technova-2026');
-  const [selectedGate, setSelectedGate] = useState('Gate 02 - Main Atrium');
+  const [selectedEventSlug, setSelectedEventSlug] = useState('');
+  const [selectedGate, setSelectedGate] = useState('Gate 01 - Main Entrance');
   const [recentCheckins, setRecentCheckins] = useState<RegistrationItem[]>([]);
   const [totalCheckedIn, setTotalCheckedIn] = useState<number>(0);
 

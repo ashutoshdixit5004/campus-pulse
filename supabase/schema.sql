@@ -59,6 +59,7 @@ CREATE TABLE registrations (
   name TEXT NOT NULL,
   student_id TEXT NOT NULL, -- Institutional Roll / ID e.g. 2503840100024
   college TEXT NOT NULL DEFAULT 'SHEAT College of Engineering',
+  branch TEXT, -- e.g. Babatpur or Gahani
   course TEXT NOT NULL, -- e.g. B.Tech Computer Science
   semester TEXT NOT NULL, -- e.g. Year 3 // Sem 5
   email TEXT NOT NULL,
@@ -113,6 +114,7 @@ CREATE TABLE IF NOT EXISTS student_accounts (
   email TEXT UNIQUE NOT NULL,
   course TEXT NOT NULL,
   college TEXT NOT NULL DEFAULT 'SHEAT College of Engineering',
+  branch TEXT, -- e.g. Babatpur or Gahani
   phone TEXT,
   password TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -147,197 +149,46 @@ CREATE INDEX idx_certificates_reg ON certificates(registration_id);
 
 -- ============================================================================
 -- 5. ROW LEVEL SECURITY (RLS) POLICIES
--- Note: Zero-login architecture allows public registration and read of events.
--- Private student access is isolated via access_token lookup.
 -- ============================================================================
 ALTER TABLE events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE registrations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE passes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE attendance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE certificates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE student_accounts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE evaluations ENABLE ROW LEVEL SECURITY;
 
--- Public read access to active events
+-- Events: Public can view active events; admin can manage all
 CREATE POLICY "Public can view events" ON events FOR SELECT USING (true);
 CREATE POLICY "Admin can manage events" ON events FOR ALL USING (true);
 
--- Registrations: Public can insert their own registration
+-- Registrations: Public can insert their own registration and view
 CREATE POLICY "Public can submit registration" ON registrations FOR INSERT WITH CHECK (true);
--- Student can view only their own registration via access_token or public summary
 CREATE POLICY "Public can view registrations" ON registrations FOR SELECT USING (true);
 CREATE POLICY "Admin can update registrations" ON registrations FOR ALL USING (true);
+CREATE POLICY "Admin can delete registrations" ON registrations FOR DELETE USING (true);
 
--- Passes: Viewable if linked to registration
+-- Passes: Public viewable, admin manageable
 CREATE POLICY "Public can view passes" ON passes FOR SELECT USING (true);
 CREATE POLICY "Admin can manage passes" ON passes FOR ALL USING (true);
 
--- Attendance: Viewable for rosters, insertable by scanner
+-- Attendance: Public viewable, admin manageable
 CREATE POLICY "Public can view attendance" ON attendance FOR SELECT USING (true);
 CREATE POLICY "Admin can manage attendance" ON attendance FOR ALL USING (true);
 
--- Certificates: Public can view verified certificates
+-- Certificates: Public viewable, admin manageable
 CREATE POLICY "Public can view certificates" ON certificates FOR SELECT USING (true);
 CREATE POLICY "Admin can manage certificates" ON certificates FOR ALL USING (true);
 
+-- Student Accounts: Public can register/login, manage own account
+CREATE POLICY "Public can access student accounts" ON student_accounts FOR ALL USING (true);
+
+-- Evaluations: Public can view results, admin can manage
+CREATE POLICY "Public can view evaluations" ON evaluations FOR SELECT USING (true);
+CREATE POLICY "Admin can manage evaluations" ON evaluations FOR ALL USING (true);
+
 -- ============================================================================
--- 6. REALISTIC DEMO SEED DATA
+-- ZERO DEMO DATA — Database starts completely clean for production use.
+-- Real administrator credentials and new student accounts persist normally.
 -- ============================================================================
-
--- Events
-INSERT INTO events (id, slug, name, description, category, date, start_time, end_time, venue, capacity, organizer_name, organizer_contact, eligibility, rules, status, event_status)
-VALUES 
-(
-  'ev_technova', 
-  'technova-2026', 
-  'Technova 2026 // 48-Hr Hackathon', 
-  'The flagship collegiate engineering tournament of the semester. 48 hours of hands-on prototyping, AI tracks, and industry maker mentorship.',
-  'Technical',
-  '2026-10-24',
-  '09:00',
-  '21:00',
-  'Main Tech Auditorium // Complex B',
-  150,
-  'ACM Student Chapter & Dept of CSE',
-  'acm@campus.edu • +1 555-0192',
-  'Open to all enrolled undergraduate & graduate STEM students',
-  'Teams of 1-4. Bring physical college ID card. Turnstile check-in mandatory for certificate.',
-  'OPEN',
-  'LIVE'
-),
-(
-  'ev_aurora', 
-  'aurora-2026', 
-  'Aurora Cultural Fest 2026', 
-  'Inter-collegiate arts, acoustics, theatre, and electronic music festival with over 20 visiting universities.',
-  'Cultural',
-  '2026-11-12',
-  '17:00',
-  '22:00',
-  'Open Air Theatre',
-  500,
-  'Student Cultural Council',
-  'cultural@campus.edu • +1 555-0188',
-  'All college students with valid student credentials',
-  'Doors open at 16:30. Entry strictly with Digital QR Pass.',
-  'OPEN',
-  'UPCOMING'
-),
-(
-  'ev_robowars', 
-  'robowars-2026', 
-  'RoboWars Arena Championship', 
-  'Weight-class combat robotics knockout tournament. 15lb & 30lb combat bot battlecage matches.',
-  'Robotics',
-  '2026-11-20',
-  '10:00',
-  '18:00',
-  'Mechanical Workshop Arena',
-  100,
-  'Robotics & Mechatronics Society',
-  'robotics@campus.edu',
-  'Engineering undergraduate cohorts',
-  'Safety cage protocols apply. Pit access restricted to registered team pilots.',
-  'CLOSED',
-  'UPCOMING'
-),
-(
-  'ev_esummit', 
-  'esummit-2026', 
-  'National E-Summit 2026', 
-  'Collegiate startup conclave, angel pitching sessions, founder keynotes, and product showcase.',
-  'Entrepreneurship',
-  '2026-10-10',
-  '09:00',
-  '17:00',
-  'Convention Hall',
-  250,
-  'E-Cell Apex & Innovation Incubator',
-  'ecell@campus.edu',
-  'All students & aspiring founders',
-  'Formal attire requested for investor lounges.',
-  'CLOSED',
-  'COMPLETED'
-),
-(
-  'ev_engineers_day',
-  'engineers-day',
-  'Engineer''s Day 2026 // Innovation Expo',
-  'Annual collegiate exhibition commemorating excellence in engineering, robotics displays, and breakthrough research project showcases.',
-  'Technical',
-  '2026-09-15',
-  '09:30',
-  '17:30',
-  'Civil & Mechanical Concourse // Ground Floor',
-  200,
-  'Dean of Student Affairs & Engineering Council',
-  'dean.affairs@campus.edu • +1 555-0199',
-  'Open to all enrolled engineering students',
-  'Project prototypes must be set up 30 minutes before judging rounds.',
-  'OPEN',
-  'UPCOMING'
-),
-(
-  'ev_hackathon_2026',
-  'hackathon-2026',
-  'Hackathon 2026 // CodeForge Summit',
-  'High-intensity 36-hour collegiate software, AI, and systems engineering hackathon with enterprise mentors.',
-  'Technical',
-  '2026-11-05',
-  '08:00',
-  '20:00',
-  'Computer Center & Innovation Wing // Lab 04',
-  120,
-  'Department of Computer Science & Engineering',
-  'hackathon@campus.edu • +1 555-0145',
-  'Undergraduate & Postgraduate CSE/IT/AI students',
-  'Teams of 2-4. Bring institutional ID card. Turnstile digital pass mandatory.',
-  'OPEN',
-  'UPCOMING'
-);
-
--- Student Accounts Demo Seed
-INSERT INTO student_accounts (id, full_name, student_id, email, course, college, phone, password)
-VALUES
-('stu_ashutosh', 'Ashutosh Dixit', '2503840100024', 'dixitashutosh5004@gmail.com', 'B.Tech CSE', 'SHEAT College of Engineering', '+1 (555) 019-2834', 'password123')
-ON CONFLICT (student_id) DO NOTHING;
-
--- Registrations (Technova 2026)
-
-INSERT INTO registrations (id, event_id, registration_number, name, student_id, college, course, semester, email, phone, status, access_token)
-VALUES
-('reg_001', 'ev_technova', 'REG-2026-TN-0492', 'Ashutosh Dixit', '2503840100024', 'SHEAT College of Engineering', 'B.Tech Computer Science', 'Year 3 // Sem 5', 'dixitashutosh5004@gmail.com', '+1 (555) 019-2834', 'VERIFIED', 'tok_alex_chen_demo_2026'),
-('reg_002', 'ev_technova', 'REG-2026-TN-0488', 'Maya Lin', 'STU-2024-3102', 'SHEAT College of Engineering', 'B.Tech AI & Data Science', 'Year 2 // Sem 3', 'maya.lin@campus.edu', '+1 (555) 018-9921', 'VERIFIED', 'tok_maya_lin_demo_2026'),
-('reg_003', 'ev_technova', 'REG-2026-TN-0475', 'Ryan Patel', 'STU-2023-9921', 'SHEAT College of Engineering', 'B.Tech Electronics & Comm', 'Year 3 // Sem 5', 'ryan.p@campus.edu', '+1 (555) 012-4412', 'VERIFIED', 'tok_ryan_patel_demo_2026'),
-('reg_004', 'ev_technova', 'REG-2026-TN-0461', 'Sarah Jenkins', 'STU-2024-1184', 'SHEAT College of Engineering', 'B.Tech Software Engineering', 'Year 1 // Sem 1', 'sarah.j@campus.edu', '+1 (555) 017-8832', 'VERIFIED', 'tok_sarah_jenkins_demo_2026'),
-('reg_005', 'ev_technova', 'REG-2026-TN-0450', 'Marcus Vance', 'STU-2024-4491', 'SHEAT College of Engineering', 'B.Tech Mechanical (Mechatronics)', 'Year 2 // Sem 3', 'marcus.v@campus.edu', '+1 (555) 019-3312', 'PENDING', 'tok_marcus_vance_demo_2026'),
-('reg_006', 'ev_technova', 'REG-2026-TN-0451', 'Elena Rostova', 'STU-2023-7729', 'SHEAT College of Engineering', 'B.Tech Computer Science', 'Year 4 // Sem 7', 'elena.r@campus.edu', '+1 (555) 014-9901', 'PENDING', 'tok_elena_rostova_demo_2026'),
-('reg_007', 'ev_technova', 'REG-2026-TN-0498', 'David Kim', 'STU-2024-5510', 'SHEAT College of Engineering', 'B.Tech Electrical & Electronics', 'Year 2 // Sem 3', 'david.kim@campus.edu', '+1 (555) 016-7782', 'VERIFIED', 'tok_david_kim_demo_2026'),
-('reg_008', 'ev_technova', 'REG-2026-TN-0452', 'Chloe Bennett', 'STU-2024-6632', 'SHEAT College of Engineering', 'B.Tech Information Science', 'Year 3 // Sem 5', 'chloe.b@campus.edu', '+1 (555) 011-2299', 'PENDING', 'tok_chloe_bennett_demo_2026');
-
--- Passes for Verified Registrations
-INSERT INTO passes (id, registration_id, pass_token, status)
-VALUES
-('pass_001', 'reg_001', 'PASS-TN-0492', 'VALID'),
-('pass_002', 'reg_002', 'PASS-TN-0488', 'VALID'),
-('pass_003', 'reg_003', 'PASS-TN-0475', 'VALID'),
-('pass_004', 'reg_004', 'PASS-TN-0461', 'VALID'),
-('pass_007', 'reg_007', 'PASS-TN-0498', 'VALID');
-
--- Attendance Check-ins (Today's Live Turnstile Stream)
-INSERT INTO attendance (id, event_id, pass_id, registration_id, gate, checked_in_at)
-VALUES
-('att_001', 'ev_technova', 'pass_001', 'reg_001', 'Gate 02', NOW() - INTERVAL '1 hour 25 minutes'),
-('att_002', 'ev_technova', 'pass_002', 'reg_002', 'Gate 02', NOW() - INTERVAL '1 hour 20 minutes'),
-('att_003', 'ev_technova', 'pass_003', 'reg_003', 'Gate 01', NOW() - INTERVAL '1 hour 15 minutes'),
-('att_004', 'ev_technova', 'pass_004', 'reg_004', 'Gate 02', NOW() - INTERVAL '1 hour 10 minutes');
-
--- Certificates (Completed Event: National E-Summit 2026)
-INSERT INTO certificates (id, event_id, registration_id, certificate_number, role, issued_at)
-VALUES
-('cert_001', 'ev_esummit', 'reg_001', 'CERT-2026-NES-0192', 'Delegate Participant', '2026-10-10 18:00:00Z');
-
--- Evaluation Demo Seed (Ashutosh Dixit - WINNER with 92 marks)
-INSERT INTO evaluations (id, event_id, registration_id, student_id, marks, feedback, result, certificate_eligible, updated_at)
-VALUES
-('eval_001', 'ev_technova', 'reg_001', '2503840100024', 92, 'Excellent performance and outstanding presentation.', 'WINNER', TRUE, NOW())
-ON CONFLICT (event_id, registration_id) DO NOTHING;
 

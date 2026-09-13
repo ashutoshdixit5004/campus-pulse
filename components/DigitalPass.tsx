@@ -14,9 +14,9 @@ interface DigitalPassProps {
 
 export default function DigitalPass({
   registration,
-  eventName = 'Technova 2026 // 48-Hr Hackathon',
-  eventDate = 'Oct 24, 2026 • 09:00 AM',
-  eventVenue = 'Main Tech Auditorium // Complex B • Gate 02',
+  eventName = 'Campus Event',
+  eventDate = 'Upcoming Session',
+  eventVenue = 'Campus Venue',
 }: DigitalPassProps) {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const { showToast } = useToast();

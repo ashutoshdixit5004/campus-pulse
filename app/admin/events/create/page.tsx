@@ -11,25 +11,23 @@ export default function CreateEventPage() {
   const router = useRouter();
   const { showToast } = useToast();
 
-  const [name, setName] = useState('Technova 2026 // Annual Hackathon');
-  const [description, setDescription] = useState(
-    'The flagship collegiate engineering tournament of the semester. 48 hours of hands-on prototyping, AI tracks, and industry maker mentorship.'
-  );
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [category, setCategory] = useState('Technical');
   const [status, setStatus] = useState<'OPEN' | 'CLOSED' | 'DRAFT'>('OPEN');
-  const [date, setDate] = useState('2026-10-24');
+  const [date, setDate] = useState('');
   const [startTime, setStartTime] = useState('09:00');
-  const [endTime, setEndTime] = useState('21:00');
-  const [venue, setVenue] = useState('Main Tech Auditorium // Complex B');
+  const [endTime, setEndTime] = useState('17:00');
+  const [venue, setVenue] = useState('');
   const [capacity, setCapacity] = useState(150);
-  const [deadline, setDeadline] = useState('2026-10-22T23:59');
-  const [organizerName, setOrganizerName] = useState('ACM Student Chapter & Dept of CSE');
-  const [organizerContact, setOrganizerContact] = useState('acm@campus.edu • +1 555-0192');
+  const [deadline, setDeadline] = useState('');
+  const [organizerName, setOrganizerName] = useState('Office of Student Affairs');
+  const [organizerContact, setOrganizerContact] = useState('events@sheat.edu • +91 542 262 4884');
   const [eligibility, setEligibility] = useState(
-    'Open to all enrolled undergraduate & graduate STEM students'
+    'Open to all enrolled undergraduate & graduate college students.'
   );
   const [rules, setRules] = useState(
-    'Teams of 1-4. Bring physical college ID card. Turnstile check-in mandatory for certificate.'
+    'Bring physical college ID card. Turnstile check-in mandatory for certificate.'
   );
 
   const [createdSlug, setCreatedSlug] = useState('');
@@ -281,7 +279,7 @@ export default function CreateEventPage() {
                     style={{ fontSize: '28px', color: 'var(--accent-orange)', marginBottom: '0.5rem' }}
                   ></i>
                   <div style={{ fontSize: '13px', fontWeight: 500 }}>
-                    technova_poster_banner_2026.webp (Attached)
+                    Upload 16:9 Event Poster (Optional)
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
                     Click or drag to replace 16:9 banner

@@ -1,19 +1,42 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, Suspense } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { getEventBySlug } from '@/lib/db';
+import { getStudentSession, StudentSession } from '@/lib/auth';
 import { EventItem } from '@/types/database';
 import StatusBadge from '@/components/StatusBadge';
+import { useToast } from '@/components/ToastProvider';
+
+function ActionParamReader({ onAction }: { onAction: (action: string | null) => void }) {
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    onAction(searchParams.get('action'));
+  }, [searchParams, onAction]);
+  return null;
+}
 
 export default function EventDetailPage() {
   const params = useParams();
+  const router = useRouter();
+  const { showToast } = useToast();
   const slug = params?.slug as string;
+
   const [event, setEvent] = useState<EventItem | null>(null);
+  const [student, setStudent] = useState<StudentSession | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isGettingPass, setIsGettingPass] = useState(false);
+  const [actionParam, setActionParam] = useState<string | null>(null);
+
+  const handleAction = useCallback((act: string | null) => {
+    setActionParam(act);
+  }, []);
 
   useEffect(() => {
+    const session = getStudentSession();
+    setStudent(session);
+
     if (slug) {
       getEventBySlug(slug).then((ev) => {
         setEvent(ev);
@@ -21,6 +44,52 @@ export default function EventDetailPage() {
       });
     }
   }, [slug]);
+
+  const handleGetPass = useCallback(async () => {
+    if (!event) return;
+    const session = student || getStudentSession();
+
+    if (!session) {
+      // Redirect to login with explicit return intent to this event and pass action
+      router.push(`/login?redirect=/events/${encodeURIComponent(event.slug)}?action=get-pass`);
+      return;
+    }
+
+    setIsGettingPass(true);
+    try {
+      const res = await fetch('/api/events/get-pass', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_id: event.slug || event.id,
+          student_id: session.student_id,
+          student: session,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to retrieve or generate pass.');
+      }
+
+      showToast('✓ Verified digital pass ready! Redirecting to secure pass portal...');
+      router.push(data.redirect_url || `/registration-status/${data.access_token}`);
+    } catch (err: any) {
+      console.error('handleGetPass error:', err);
+      showToast(err.message || 'Could not retrieve pass. Please try again.', 'error');
+      setIsGettingPass(false);
+    }
+  }, [event, student, router, showToast]);
+
+  // Handle auto-action from login redirect (Login → Event?action=get-pass → Pass page)
+  useEffect(() => {
+    if (actionParam === 'get-pass' && event && !isGettingPass) {
+      const session = student || getStudentSession();
+      if (session) {
+        handleGetPass();
+      }
+    }
+  }, [actionParam, event, student, isGettingPass, handleGetPass]);
 
   if (loading) {
     return (
@@ -43,6 +112,9 @@ export default function EventDetailPage() {
 
   return (
     <section className="view-section active">
+      <Suspense fallback={null}>
+        <ActionParamReader onAction={handleAction} />
+      </Suspense>
       {/* Public Header Notice */}
       <div
         style={{
@@ -154,8 +226,50 @@ export default function EventDetailPage() {
               </div>
             </div>
 
-            <Link href={`/register/${event.slug}`} className="btn btn-primary" style={{ width: '100%', padding: '0.85rem' }}>
-              <i className="fa-solid fa-arrow-right"></i> PROCEED TO REGISTRATION FORM
+            <button
+              id="get-pass-btn"
+              type="button"
+              onClick={handleGetPass}
+              disabled={isGettingPass || event.status === 'CLOSED'}
+              className="btn btn-primary"
+              style={{
+                width: '100%',
+                padding: '0.9rem',
+                marginBottom: '0.75rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                fontSize: '14px',
+                fontWeight: 700,
+                letterSpacing: '0.5px',
+              }}
+            >
+              {isGettingPass ? (
+                <>
+                  <i className="fa-solid fa-spinner fa-spin"></i> GENERATING SECURE PASS...
+                </>
+              ) : (
+                <>
+                  <i className="fa-solid fa-ticket"></i> GET PASS
+                </>
+              )}
+            </button>
+
+            <Link
+              href={`/register/${event.slug}`}
+              className="btn btn-secondary"
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                fontSize: '13px',
+              }}
+            >
+              <i className="fa-solid fa-file-signature"></i> PROCEED TO REGISTRATION FORM
             </Link>
           </div>
 

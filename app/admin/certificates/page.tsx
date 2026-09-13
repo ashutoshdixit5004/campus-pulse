@@ -226,11 +226,11 @@ export default function AdminCertificatesPage() {
       <CertificateModal
         isOpen={isCertModalOpen}
         onClose={() => setIsCertModalOpen(false)}
-        eventTitle={selectedEvent?.name || 'Technova 2026'}
-        studentName="Ashutosh Dixit"
+        eventTitle={selectedEvent?.name || 'Campus Event'}
+        studentName="Student"
         role="Verified Attendee"
-        date={selectedEvent?.date || 'Oct 24, 2026'}
-        authCode="CERT-2026-TN-0841"
+        date={selectedEvent?.date || new Date().toISOString().split('T')[0]}
+        authCode={`CERT-2026-ST-${Date.now().toString().slice(-6)}`}
       />
     </section>
   );
